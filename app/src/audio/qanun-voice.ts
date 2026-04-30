@@ -80,8 +80,11 @@ export function triggerQanun(t: QanunVoiceTrigger): void {
   fbLp.Q.value = 0.707;
 
   const fbGain = ctx.createGain();
-  // Decay maps to feedback gain in [0.92, 0.998].
-  fbGain.gain.value = 0.92 + decay * 0.078;
+  // Decay maps to feedback gain in [0.90, 0.985] — capped well below
+  // 1.0 so the K-S loop cannot self-oscillate even on long sustains.
+  // 0.998 was unstable in practice (loop ringing growing past unity
+  // after a few pluck overlaps). 0.985 still gives ~3-5s tails.
+  fbGain.gain.value = 0.90 + decay * 0.085;
 
   // Loop wiring: delay → fbLp → fbGain → delay
   delay.connect(fbLp);
@@ -127,9 +130,12 @@ export function triggerQanun(t: QanunVoiceTrigger): void {
 
   // Output envelope — a long exponential tail so the K-S loop's natural
   // decay dominates but we cleanly stop after ~6s for sustain headroom.
+  // Peak amp 0.25 × velocity (was 0.6); per-voice headroom matters when
+  // multiple plucks overlap — the master bus has a limiter but we want
+  // to stay well below the threshold under normal play.
   const env = ctx.createGain();
   env.gain.setValueAtTime(0.0001, when);
-  env.gain.linearRampToValueAtTime(v * 0.6, when + 0.005);
+  env.gain.linearRampToValueAtTime(v * 0.25, when + 0.005);
   env.gain.exponentialRampToValueAtTime(0.0001, when + 6);
 
   bodyMixed.connect(env);
