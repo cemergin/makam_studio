@@ -9,7 +9,7 @@ import { useCallback, useRef, useState } from 'react';
 import type { MaqamPreset } from '../tuning/types';
 import { centsToHz } from '../tuning/cents-math';
 import { defaultKararHz } from '../tuning/maqamat';
-import { triggerVoice, type VoiceId } from '../audio/voices';
+import { triggerVoice, type VoiceId, type ADSR } from '../audio/voices';
 import { StringRow } from './StringRow';
 import { useQanunState } from './use-qanun-state';
 import { useKeyboardInput } from '../keyboard/use-keyboard-input';
@@ -24,13 +24,15 @@ interface Props {
   brightness: number;
   decay: number;
   body: number;
+  /** ADSR envelope (full a/d/s/r). Sustained voices hold at S until release. */
+  adsr: ADSR;
   /** Karar transpose in semitones (default 0). Multiplies kararHz by 2^(n/12). */
   kararSemitoneOffset?: number;
 }
 
 export function QanunInstrument({
   maqam, audioContext, destination, voiceId, brightness, decay, body,
-  kararSemitoneOffset = 0,
+  adsr, kararSemitoneOffset = 0,
 }: Props) {
   const state = useQanunState(maqam);
   const kararHz = defaultKararHz(maqam) * Math.pow(2, kararSemitoneOffset / 12);
@@ -69,6 +71,7 @@ export function QanunInstrument({
     brightness,
     decay,
     body,
+    adsr,
     maqam,
     kararHz,
     state,
@@ -87,6 +90,7 @@ export function QanunInstrument({
       brightness,
       decay,
       body,
+      adsr,
     });
     flashString(stringIndex);
   };
@@ -116,6 +120,7 @@ export function QanunInstrument({
       brightness: brightness * 0.8,
       decay: decay * 0.7,
       body,
+      adsr,
     });
   };
 

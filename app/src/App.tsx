@@ -19,7 +19,7 @@ import { QanunInstrument } from './qanun/QanunInstrument';
 import { SynthControls } from './synth/SynthControls';
 import { FxControls } from './synth/FxControls';
 import { KeyboardOverlay } from './keyboard/KeyboardOverlay';
-import type { VoiceId } from './audio/voices';
+import type { VoiceId, ADSR } from './audio/voices';
 
 const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'] as const;
 
@@ -65,6 +65,10 @@ export function App() {
   }, [masterVolume, bus]);
 
   const [tweaksOpen, setTweaksOpen] = useState(true);
+
+  // ADSR envelope. Default: instant attack, short decay to a moderate
+  // sustain, ~0.5s release. Held keys sustain at S until released.
+  const [adsr, setAdsr] = useState<ADSR>({ a: 0.005, d: 0.4, s: 0.5, r: 0.5 });
 
   // Karar transpose in semitones from the maqam's preset karar.
   // 0 = preset karar; positive = up. The 12 chromatic buttons map to
@@ -160,6 +164,7 @@ export function App() {
           brightness={brightness}
           decay={decay}
           body={body}
+          adsr={adsr}
           kararSemitoneOffset={kararSemitoneOffset}
         />
       </main>
@@ -189,11 +194,13 @@ export function App() {
             decay={decay}
             body={body}
             masterVolume={masterVolume}
+            adsr={adsr}
             onVoiceId={setVoiceId}
             onBrightness={setBrightness}
             onDecay={setDecay}
             onBody={setBody}
             onMasterVolume={setMasterVolume}
+            onAdsr={setAdsr}
           />
           <FxControls bus={bus} />
         </aside>

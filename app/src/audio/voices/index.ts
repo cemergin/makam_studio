@@ -5,7 +5,7 @@
 // purely additive — no changes to QanunInstrument or callers beyond
 // passing a different `voiceId`.
 
-import { triggerQanun } from '../qanun-voice';
+import { triggerQanun, triggerQanunSustained, type ADSR, type VoiceHandle } from '../qanun-voice';
 import { triggerVaporPluck } from './vapor-pluck';
 import { triggerSynthwaveSaw } from './synthwave-saw';
 import { triggerDreamPad } from './dream-pad';
@@ -13,6 +13,7 @@ import { triggerDreamPad } from './dream-pad';
 export { triggerVaporPluck } from './vapor-pluck';
 export { triggerSynthwaveSaw } from './synthwave-saw';
 export { triggerDreamPad } from './dream-pad';
+export type { VoiceHandle, ADSR } from '../qanun-voice';
 
 export type VoiceId = 'qanun' | 'vapor-pluck' | 'synthwave-saw' | 'dream-pad';
 
@@ -41,7 +42,7 @@ export const VOICES: VoiceMeta[] = [
   { id: 'dream-pad',     label: 'Dream Pad' },
 ];
 
-export function triggerVoice(voiceId: VoiceId, t: VoiceTrigger): void {
+export function triggerVoice(voiceId: VoiceId, t: VoiceTrigger & { adsr?: ADSR }): void {
   switch (voiceId) {
     case 'qanun':
       triggerQanun(t);
@@ -56,9 +57,26 @@ export function triggerVoice(voiceId: VoiceId, t: VoiceTrigger): void {
       triggerDreamPad(t);
       return;
     default: {
-      // Exhaustiveness check.
       const _exhaustive: never = voiceId;
       throw new Error(`Unknown voiceId: ${String(_exhaustive)}`);
     }
   }
+}
+
+/** Sustained dispatch — only qanun supports a release handle right
+ *  now. Other voices fall back to the one-shot path and return a
+ *  no-op handle so callers don't have to special-case. */
+export function triggerVoiceSustained(
+  voiceId: VoiceId,
+  t: VoiceTrigger & { adsr?: ADSR },
+): VoiceHandle {
+  if (voiceId === 'qanun') {
+    return triggerQanunSustained(t);
+  }
+  triggerVoice(voiceId, t);
+  return {
+    release() { /* no-op */ },
+    setFrequency() { /* no-op */ },
+    get released() { return true; },
+  };
 }
