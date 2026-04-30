@@ -1,0 +1,25 @@
+{
+  "name": "makam-studio-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Browser-based maqam synthesizer with a qanun-like control surface. Phase 2 scaffold.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "dexie": "^4.4.2",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.9",
+    "vite-plugin-pwa": "^1.2.0"
+  }
+}

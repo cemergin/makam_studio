@@ -1,0 +1,115 @@
+# INDEX.yaml — /app (shipping React application, Phase 2 scaffold)
+# The makam_studio React 19 + Vite 8 + TypeScript app. Phase 2 in progress;
+# this commit only stands up the shell. Functional UI lands in subsequent
+# commits.
+
+path: app
+purpose: >
+  The React 19 + Vite 8 + TypeScript app that ships to GitHub Pages at
+  https://cemergin.github.io/makam_studio/. Vendor-copies the framework-free
+  audio + MIDI + PWA core from musical-core into src/_core/ (edit-only-via-
+  sync; see src/_core/SYNC.md). v1 will ship 5 lead voices, ~24 maqam
+  presets across Turkish/Arabic/Persian, MIDI in/out with single-channel
+  pitch-bend translation, drone subsystem with Tab-modulation, split-keyboard
+  UI with karar slider, PWA / offline / share-link / IndexedDB persistence.
+
+last_indexed: 2026-04-30
+phase: 2-scaffold
+
+tech_stack:
+  runtime: React 19, TypeScript 6
+  build: Vite 8, Bun 1.x
+  data: Dexie 4 (IndexedDB)
+  pwa: vite-plugin-pwa 1.2 (registerType 'prompt' — v1 is alpha)
+  midi: Web MIDI API (vendored from musical-core/midi/)
+  deploy: GitHub Pages (base '/makam_studio/'; dev port 5176)
+
+entrypoints:
+  html: index.html
+  js: src/main.tsx
+  root_component: src/App.tsx
+
+contents:
+  - name: src/main.tsx
+    kind: file
+    summary: React 19 root mount with StrictMode wrapper.
+
+  - name: src/App.tsx
+    kind: file
+    summary: >
+      Placeholder shell. Renders the headline, tagline, "Phase 2 in
+      progress" banner, three (non-functional) layout-mode toggle buttons,
+      and a footer linking to MANIFESTO.md + the GitHub repo. Functional
+      UI lands in subsequent commits.
+
+  - name: src/styles.css
+    kind: file
+    summary: >
+      Minimal warm-light theme. CSS variables match the consuming-app
+      requirement from musical-core PORT_LOG §"Known issues" #6
+      (--bg-2, --fg, --line, --accent, --muted, --sans, --bg-sunk).
+      Full v1 palette per docs/spec/v1.md §18 lands later.
+
+  - name: src/_core/
+    kind: folder
+    summary: >
+      Vendor-copied snapshot of musical-core/src/. Edit-only-via-sync;
+      see src/_core/SYNC.md for the policy and re-sync command. The
+      underscore prefix is the visual cue.
+
+  - name: public/manifest.webmanifest
+    kind: file
+    summary: >
+      PWA manifest. start_url + scope = '/makam_studio/'. theme_color
+      #0d4f5c (deep teal), background_color #fbf7f0 (warm white). Icon
+      paths are stubbed at this stage.
+
+  - name: index.html
+    kind: file
+    summary: >
+      App shell. <meta name="theme-color"> and <link rel="manifest"> wired
+      to the PWA manifest. Single <script> module entry.
+
+  - name: vite.config.ts
+    kind: file
+    summary: >
+      Vite + React + vite-plugin-pwa. base '/makam_studio/' for GitHub
+      Pages. Port 5176 (BeatForge owns 5174; musical-core playground 5175).
+      registerType 'prompt' — alpha; no silent updates.
+
+  - name: tsconfig.json
+    kind: file
+    summary: >
+      TypeScript 6 strict config. Mirrors musical-core/playground/tsconfig.json
+      (target ES2022, moduleResolution Bundler, jsx react-jsx, etc.).
+
+  - name: package.json
+    kind: file
+    summary: >
+      Scripts: dev, build, preview. React 19, React-DOM 19, Dexie 4 deps.
+      Vite 8, vite-plugin-pwa 1.2, TypeScript ~6.0 dev deps. NOT a workspace
+      member of musical-core — vendor-copy is the integration story.
+
+invariants:
+  - "src/_core/ is vendor-copied, not workspace-linked. Do not edit files
+     inside _core/ directly. See src/_core/SYNC.md for the re-sync command
+     and policy."
+  - "The underscore prefix on _core/ is the visual cue that the directory
+     is edit-only-via-sync."
+  - "Dev port is 5176 to avoid collisions with BeatForge (5174) and the
+     musical-core playground (5175). Do not change without coordinating."
+  - "GitHub Pages base is '/makam_studio/'; localStorage / Dexie keys
+     should be namespaced 'ms_*' to avoid collisions if both BeatForge
+     (bf_*) and makam_studio share an origin during local testing."
+
+related:
+  - path: ../MANIFESTO.md
+    why: The constitution. Every architectural choice traces back to it.
+  - path: ../docs/spec/v1.md
+    why: The build-from spec — 20 sections covering every v1 subsystem.
+  - path: ../docs/design-direction.md
+    why: 10 tactical pivots that override anything in research/.
+  - path: src/_core/SYNC.md
+    why: musical-core sync log (commit SHA, re-sync command, policy).
+  - path: ../research/beatforge-reusable-research-mining.md
+    why: What was forked, what was deferred, what is cross-link-only.
