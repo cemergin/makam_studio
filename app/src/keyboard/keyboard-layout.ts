@@ -72,7 +72,11 @@ function octaveShiftToRegister(shift: number): 'low' | 'mid' | 'tiz' | null {
 /** Resolve a `(degree, octaveShift)` pair to a string-index in the
  *  qanun's flat string array. Degrees that overflow the scale length
  *  carry into the next-octave register (e.g. degree 8 in oct 0 of an
- *  8-row maqam → degree 1 in oct +1 — the same pitch class). */
+ *  8-row maqam → degree 1 in oct +1 — the same pitch class).
+ *
+ *  Uses the qanun's actual string layout where the LAST row of low and
+ *  mid registers is skipped (the octave-equivalent pitch overlaps with
+ *  the next register's first row). */
 export function resolveStringIndex(
   maqam: MaqamPreset,
   degree: number,
@@ -83,8 +87,6 @@ export function resolveStringIndex(
 
   let d = degree;
   let octs = octaveShift;
-  // For 8-row presets: degree 8 = octave above degree 1. Collapse so
-  // string indices stay within the [0, 3N) range we ship.
   while (d > N) {
     d -= N;
     octs += 1;
@@ -98,7 +100,24 @@ export function resolveStringIndex(
   if (!reg) return null;
   const regIdx = REGISTERS.indexOf(reg);
   if (regIdx < 0) return null;
-  return regIdx * N + (d - 1);
+
+  // Layout: low + mid skip degree N; tiz includes all N rows.
+  // Index counts:
+  //   low  rows 1..N-1 → indices 0..N-2  (count N-1)
+  //   mid  rows 1..N-1 → indices N-1..2N-3  (count N-1)
+  //   tiz  rows 1..N   → indices 2N-2..3N-2  (count N)
+  if (regIdx === 0) {
+    // low — degree N maps to next register's degree 1
+    if (d === N) return resolveStringIndex(maqam, 1, octs + 1);
+    return d - 1;
+  }
+  if (regIdx === 1) {
+    // mid — same wrap-up rule for degree N
+    if (d === N) return resolveStringIndex(maqam, 1, octs + 1);
+    return (N - 1) + (d - 1);
+  }
+  // tiz — full N rows
+  return 2 * (N - 1) + (d - 1);
 }
 
 /** Apply a transpose offset (in scale degrees) to a `(degree, oct)`

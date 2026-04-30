@@ -42,6 +42,8 @@ interface UseKeyboardInputArgs {
   maqam: MaqamPreset;
   kararHz: number;
   state: QanunState;
+  /** Called whenever a keyboard pluck fires, with the string index that was triggered. */
+  onPluck?: (stringIndex: number) => void;
 }
 
 interface ActiveNote {
@@ -92,6 +94,7 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         hz,
         time: a.audioContext.currentTime,
       };
+      a.onPluck?.(stringIndex);
     };
 
     const handleScaleKey = (code: string) => {
@@ -135,27 +138,11 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
             a.state.stepMandal(stringIndex, step);
           }
         }
-        // Re-pluck at the canonical pitch. We can compute the target
-        // sounding cents directly from the legal table without waiting
-        // for the React state update.
-        const newMid = legal[targetIdx].cents_from_karar;
-        const sounding =
-          newMid + (s.octave === 'low' ? -1200 : s.octave === 'tiz' ? 1200 : 0);
-        const hz = centsToHz(a.kararHz, sounding);
-        triggerVoice(a.voiceId, {
-          audioContext: a.audioContext,
-          destination: a.destination,
-          frequencyHz: hz,
-          velocity: 0.7,
-          brightness: a.brightness,
-          decay: a.decay,
-          body: a.body,
-        });
-        activeNoteRef.current = {
-          stringIndex,
-          hz,
-          time: a.audioContext.currentTime,
-        };
+        // Retune the active string but DO NOT re-pluck — modifiers slide
+        // the underlying tuning so the next pluck of this string lands
+        // at the new pitch. (Continuous-slide on the ringing voice is a
+        // future feature; needs the voice to expose a live frequency
+        // handle.)
         return true;
       }
 
@@ -176,26 +163,9 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
           a.state.stepMandal(stringIndex, dir);
         }
       }
-      // Pluck at the resolved pitch (computed locally so we don't wait
-      // for the state update to land).
-      const newMid = legal[targetIdx].cents_from_karar;
-      const sounding =
-        newMid + (s.octave === 'low' ? -1200 : s.octave === 'tiz' ? 1200 : 0);
-      const hz = centsToHz(a.kararHz, sounding);
-      triggerVoice(a.voiceId, {
-        audioContext: a.audioContext,
-        destination: a.destination,
-        frequencyHz: hz,
-        velocity: 0.7,
-        brightness: a.brightness,
-        decay: a.decay,
-        body: a.body,
-      });
-      activeNoteRef.current = {
-        stringIndex,
-        hz,
-        time: a.audioContext.currentTime,
-      };
+      // Retune-only: don't re-pluck. The change persists in the qanun
+      // state so the next time this string is plucked it sounds at the
+      // new pitch.
       return true;
     };
 

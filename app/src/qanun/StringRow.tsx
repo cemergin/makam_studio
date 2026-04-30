@@ -11,11 +11,12 @@ interface Props {
   legal: readonly MandalPosition[];
   currentIndex: number;
   isKarar: boolean;
+  isFlashing?: boolean;
   onStep: (step: 1 | -1) => void;
   onPluck: () => void;
 }
 
-export function StringRow({ s, legal, currentIndex, isKarar, onStep, onPluck }: Props) {
+export function StringRow({ s, legal, currentIndex, isKarar, isFlashing, onStep, onPluck }: Props) {
   const perde = resolvePerde(s.soundingCents);
   const inflectionStr =
     perde.inflection === 0
@@ -28,6 +29,7 @@ export function StringRow({ s, legal, currentIndex, isKarar, onStep, onPluck }: 
     'string-row',
     isKarar ? 'string-row--karar' : '',
     s.isModified ? 'string-row--modified' : '',
+    isFlashing ? 'string-row--flashing' : '',
     `string-row--${s.octave}`,
   ]
     .filter(Boolean)

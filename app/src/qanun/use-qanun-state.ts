@@ -46,12 +46,25 @@ export interface QanunState {
 }
 
 /** Build the initial MandalState array for a maqam: 3 octaves × N rows
- *  of strings, each at its canonical position. */
+ *  of strings, each at its canonical position.
+ *
+ *  Skip the LAST row in low + mid registers — its canonical cents equal
+ *  the next register's degree-1, so rendering both produces a duplicate
+ *  pitch (e.g. mid-Gerdâniye 1200¢ == tiz-Rast 1200¢). The highest
+ *  register keeps its full row count so the top-octave karar still
+ *  appears as a string. */
 function buildInitialState(maqam: MaqamPreset): MandalState[] {
   const out: MandalState[] = [];
   let i = 0;
-  for (const reg of REGISTERS) {
-    for (const row of maqam.rows) {
+  const N = maqam.rows.length;
+  for (let regIdx = 0; regIdx < REGISTERS.length; regIdx++) {
+    const reg = REGISTERS[regIdx];
+    const isHighestReg = regIdx === REGISTERS.length - 1;
+    for (let r = 0; r < N; r++) {
+      const isLastRow = r === N - 1;
+      // Drop the octave-equivalent row in low + mid registers.
+      if (isLastRow && !isHighestReg) continue;
+      const row = maqam.rows[r];
       out.push({
         string_index: i,
         row_degree: row.degree,

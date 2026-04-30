@@ -18,7 +18,10 @@ import { MaqamRail } from './qanun/MaqamRail';
 import { QanunInstrument } from './qanun/QanunInstrument';
 import { SynthControls } from './synth/SynthControls';
 import { FxControls } from './synth/FxControls';
+import { KeyboardOverlay } from './keyboard/KeyboardOverlay';
 import type { VoiceId } from './audio/voices';
+
+const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'] as const;
 
 export function App() {
   const { ctx, state: audioState, resume } = useAudioContext();
@@ -63,6 +66,12 @@ export function App() {
 
   const [tweaksOpen, setTweaksOpen] = useState(true);
 
+  // Karar transpose in semitones from the maqam's preset karar.
+  // 0 = preset karar; positive = up. The 12 chromatic buttons map to
+  // absolute note positions; we convert to a semitone offset relative
+  // to the preset karar so the offset survives maqam switches.
+  const [kararSemitoneOffset, setKararSemitoneOffset] = useState(0);
+
   const maqamat = useMemo(() => ALL_MAQAMAT, []);
 
   return (
@@ -104,6 +113,45 @@ export function App() {
       <MaqamRail maqamat={maqamat} active={maqam} onSelect={setMaqam} />
 
       <main className="main">
+        <div className="karar-bar" role="group" aria-label="Karar transpose">
+          <span className="karar-bar__label">karar transpose</span>
+          {NOTE_NAMES.map((n, i) => {
+            // i is semitones from C. We treat 0 = preset (no offset)
+            // when no offset has been set; the visual highlight tracks
+            // (kararSemitoneOffset mod 12).
+            const offsetMod = ((kararSemitoneOffset % 12) + 12) % 12;
+            const active = i === offsetMod;
+            return (
+              <button
+                key={n}
+                type="button"
+                className={`karar-bar__note ${active ? 'karar-bar__note--active' : ''}`}
+                onClick={() => setKararSemitoneOffset(i)}
+                title={`Set karar offset to +${i} semitone${i === 1 ? '' : 's'}`}
+              >
+                {n}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className="karar-bar__step"
+            onClick={() => setKararSemitoneOffset((v) => v - 12)}
+            aria-label="Karar one octave down"
+          >−8</button>
+          <button
+            type="button"
+            className="karar-bar__step"
+            onClick={() => setKararSemitoneOffset((v) => v + 12)}
+            aria-label="Karar one octave up"
+          >+8</button>
+          <button
+            type="button"
+            className="karar-bar__reset"
+            onClick={() => setKararSemitoneOffset(0)}
+          >reset</button>
+          <span className="karar-bar__readout">{kararSemitoneOffset >= 0 ? '+' : ''}{kararSemitoneOffset} st</span>
+        </div>
         <QanunInstrument
           maqam={maqam}
           audioContext={ctx}
@@ -112,8 +160,10 @@ export function App() {
           brightness={brightness}
           decay={decay}
           body={body}
+          kararSemitoneOffset={kararSemitoneOffset}
         />
       </main>
+      <KeyboardOverlay />
 
       {tweaksOpen ? (
         <aside className="tweaks" aria-label="Tweaks">

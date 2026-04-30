@@ -735,3 +735,136 @@ input[type='range'] {
 }
 
 .audio-resume:hover { filter: brightness(1.1); }
+
+/* ===================================================================
+   Phase 2.2 additions — flash, karar bar, keyboard overlay
+   =================================================================== */
+
+/* String row flash on pluck (250ms saffron glow) ------------------- */
+.string-row--flashing {
+  animation: stringFlash 250ms ease-out;
+}
+@keyframes stringFlash {
+  0%   { background: rgba(232, 213, 106, 0.55); }
+  100% { background: transparent; }
+}
+
+/* Karar transpose bar (above the qanun grid) ----------------------- */
+.karar-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 2px solid #0a1316;
+  border-radius: 2px;
+  font-family: var(--sans);
+  flex-wrap: wrap;
+}
+.karar-bar__label {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--cream);
+  margin-right: 8px;
+  font-weight: 800;
+}
+.karar-bar__note,
+.karar-bar__step,
+.karar-bar__reset {
+  background: var(--bg-2);
+  color: var(--cream);
+  border: 1.5px solid #0a1316;
+  border-radius: 2px;
+  padding: 4px 8px;
+  font: 600 12px/1 var(--sans);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.karar-bar__note { min-width: 28px; }
+.karar-bar__note:hover,
+.karar-bar__step:hover,
+.karar-bar__reset:hover {
+  background: var(--tile-turquoise);
+  color: #0a1316;
+}
+.karar-bar__note--active {
+  background: var(--saffron);
+  color: #0a1316;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.7);
+}
+.karar-bar__readout {
+  margin-left: auto;
+  font: 700 11px/1 var(--sans);
+  color: var(--saffron);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+
+/* Keyboard overlay (bottom-of-screen live key tape + cheat sheet) -- */
+.kbo {
+  position: fixed;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  background: rgba(10, 19, 22, 0.88);
+  border: 2px solid #0a1316;
+  border-radius: 4px;
+  z-index: 1000;
+  font-family: var(--sans);
+  pointer-events: none; /* don't steal focus or clicks */
+  box-shadow: 0 4px 0 rgba(0,0,0,0.55);
+}
+.kbo__group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 12px;
+  border-right: 1px solid var(--line);
+}
+.kbo__group:last-child { border-right: none; padding-right: 0; }
+.kbo__row {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+.kbo__key {
+  display: inline-block;
+  min-width: 22px;
+  text-align: center;
+  padding: 3px 6px;
+  background: var(--bg-2);
+  color: var(--cream);
+  border: 1.2px solid #0a1316;
+  border-radius: 2px;
+  font: 700 11px/1 var(--sans);
+  text-transform: uppercase;
+  transition: background 80ms, color 80ms, transform 60ms;
+}
+.kbo__key--scale { background: #2a3338; }
+.kbo__key--flower { background: #3a2832; }
+.kbo__key--special { background: #1f3232; min-width: 28px; }
+.kbo__key--held {
+  background: var(--saffron) !important;
+  color: #0a1316 !important;
+  transform: translateY(1px);
+  box-shadow: 0 0 8px rgba(232, 213, 106, 0.7);
+}
+.kbo__row-label {
+  margin-left: 4px;
+  text-transform: uppercase;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+}
+.kbo__hint {
+  margin-left: 6px;
+  font: 400 10px/1 var(--sans);
+  color: var(--muted);
+}
