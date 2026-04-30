@@ -23,13 +23,15 @@ It ships a **multi-tradition catalog** with regional flavor (Cairene Sikah ≈ 3
 
 ## 2. Why we are building it
 
-Three reasons, ordered by importance.
+Four reasons, ordered by importance.
 
-**Public-good economics.** A serious physical Turkish qanun starts at ~$1,500 and runs to $15,000+; a Yarman 79-tone or Weiss Al-Kindî qanun is $20,000+. The apprenticeship pipeline that produces master luthiers is contracting in the diaspora. Most prospective maqam musicians cannot afford the instrument. A free, open, offline-capable browser instrument is a public good for students, diaspora kids, music teachers in under-resourced schools, electronic-music people curious about microtonality, and active practitioners who want a portable rig that fits in a backpack.
+**Paradigm experimentation through software.** There is no good digital interface for playing maqam-based music. The wave-2 UX review surveyed every commercial and open-source maqam app, every microtonal keyboard, and every DAW tuning extension; the competitive landscape is effectively empty. That gap is also an opportunity: the design space of maqam interfaces is wide open, and software is the right medium for exploring it. We can prototype the split-keyboard, the qanun-honor view, the autoharp-button preset grid, the MIDI translator, the drone subsystem with Tab-modulation, the modern-synth voice category — multiple paradigm experiments running in one repo. Hardware iteration costs months and thousands of dollars per prototype; software iteration costs an afternoon. We are not just shipping a tool. We are running an open laboratory for what playing maqam in 2026+ can look like.
 
 **Microtonal accuracy as honesty.** A 12-EDO piano cannot play maqam. A 24-EDO quarter-tone keyboard plays approximate Mashriqi maqam but not Turkish (Holdrian commas), Persian (koron/sori), Byzantine (72-moria), or true performance-practice intonation in any of them — the same name "Sikah" denotes pitches separated by 40+ cents across regional schools. A tool that rounds these to whatever-grid-it-already-supports erases the music. makam_studio does not round.
 
 **The cross-tradition reframe.** Maqam, raga, dastgāh, mugham, octoechos, tab', dromos — these traditions share microtonal practice, drone- or shahed-anchored melodic modeling, modal hierarchy beyond scale, and seyir-like contour rules. They are not the same; each has its own theoretical lineage and aesthetic. But the boundary between them is theoretical, not acoustic. Modeling them separately wastes engineering work; modeling them together — without flattening differences — is the project's honest claim.
+
+**Public-good economics.** A serious physical Turkish qanun starts at ~$1,500 and runs to $15,000+; a Yarman 79-tone or Weiss Al-Kindî qanun is $20,000+. The apprenticeship pipeline that produces master luthiers is contracting in the diaspora. Most prospective maqam musicians cannot afford the instrument. A free, open, offline-capable browser instrument is a public good for students, diaspora kids, music teachers in under-resourced schools, electronic-music people curious about microtonality, and active practitioners who want a portable rig that fits in a backpack.
 
 ## 3. Core beliefs (the cultural posture)
 
@@ -180,8 +182,12 @@ Carried into Phase 1.
 
 ## 13. Closing — the spirit
 
-The project's success metric is not downloads. It is *whether a 14-year-old in Detroit whose grandmother was an Aleppine takht qanun player can play her grandmother's music on her phone, in the actual tuning, without paying anyone for permission.*
+The project's success metrics are twofold.
 
-Everything else — the tuning-data layer, the MIDI translator, the drone, the synth voices, the UI — exists to serve that scene. When in doubt about a feature, a tradeoff, or a pivot, ask whether it brings that scene closer or farther.
+First — *access*: whether a 14-year-old in Detroit whose grandmother was an Aleppine takht qanun player can play her grandmother's music on her phone, in the actual tuning, without paying anyone for permission. Nobody who wants in stays out for economic or geographic reasons.
 
-The instrument is not in the screen. It is in her hands.
+Second — *inspiration*: whether that same 14-year-old grows up to make something her grandmother could not have imagined. A maqam vaporwave EP. A drone-modulating ambient set. A hybrid raga-mugham sketch. A paradigm someone else's tool will borrow from. The project succeeded if it lit curiosity, deepened practice, and inspired the next generation to take maqam in new and fresh directions.
+
+Everything else — the tuning-data layer, the MIDI translator, the drone, the synth voices, the UI, the modern-synth patches, the ten paradigm experiments running in parallel — exists to serve these two metrics. When in doubt about a feature, a tradeoff, or a pivot, ask whether it brings access closer or whether it widens the creative range. If it does neither, drop it.
+
+The instrument is not in the screen. It is in her hands, and in the music she has not yet imagined.
