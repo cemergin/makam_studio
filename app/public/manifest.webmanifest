@@ -1,14 +1,14 @@
 {
   "_comment": "Adapted from ~/lab/musical-core/templates/manifest.webmanifest.template (originally forked from beatforge@86c1b88c92fdd86ac40ee1e1ee88fa3f08765ca2). Phase 2 scaffold; icon assets are stubbed.",
-  "name": "makam_studio",
+  "name": "makam_studio · qanun",
   "short_name": "makam",
-  "description": "Browser-based maqam synthesizer with a qanun-like control surface.",
+  "description": "Browser-based maqam synthesizer with a qanun-style control surface.",
   "start_url": "/makam_studio/",
   "scope": "/makam_studio/",
   "display": "standalone",
   "orientation": "any",
-  "theme_color": "#0d4f5c",
-  "background_color": "#fbf7f0",
+  "theme_color": "#1d6f7a",
+  "background_color": "#8c9498",
   "icons": [
     {
       "src": "/makam_studio/icons/icon-192.png",

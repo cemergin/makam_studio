@@ -1,99 +1,129 @@
-import { useState } from 'react';
+// makam_studio — main app shell.
+//
+// Layout: 3-column grid (rail | main | tweaks). Header spans full width.
+// The tweaks panel collapses to a thin strip; users expand it for synth
+// + FX controls. Audio context lazily resumes on the first user gesture.
 
-// Phase 2 placeholder shell. NO functional UI yet.
-// The three layout-mode buttons below are non-functional and exist only to
-// demonstrate the upcoming structure (per docs/spec/v1.md §2.6 and the
-// design-direction.md "Pivot 1" note that the qanun-honor view is a toggle,
-// not the default).
+import { useEffect, useMemo, useRef, useState } from 'react';
+import './styles/istanbul-brutalist.css';
 
-type LayoutMode = 'split-keyboard' | 'single-surface' | 'qanun-honor';
+import { ALL_MAQAMAT, RAST } from './tuning/maqamat';
+import type { MaqamPreset } from './tuning/types';
 
-const LAYOUTS: ReadonlyArray<{ id: LayoutMode; label: string; hint: string }> = [
-  {
-    id: 'split-keyboard',
-    label: 'Split keyboard',
-    hint: 'Default. Left zone = preset selector + karar slider; right zone = microtonal piano.',
-  },
-  {
-    id: 'single-surface',
-    label: 'Single surface',
-    hint: 'Hide the left zone; expand the keyboard for full-width playing.',
-  },
-  {
-    id: 'qanun-honor',
-    label: 'Qanun honor',
-    hint: 'Trapezoidal mandal grid view — for users who already know the instrument.',
-  },
-];
+import { useAudioContext } from './audio/audio-context';
+import { createMasterBus } from './audio/master-bus';
+import type { MasterBus } from './audio/master-bus';
+
+import { MaqamRail } from './qanun/MaqamRail';
+import { QanunInstrument } from './qanun/QanunInstrument';
+import { SynthControls } from './synth/SynthControls';
+import { FxControls } from './synth/FxControls';
 
 export function App() {
-  const [layout, setLayout] = useState<LayoutMode>('split-keyboard');
+  const { ctx, state: audioState, resume } = useAudioContext();
+  const busRef = useRef<MasterBus | null>(null);
+
+  // Build the master bus once; recreate if the AudioContext is replaced
+  // (it isn't, but we guard anyway).
+  if (!busRef.current) {
+    busRef.current = createMasterBus(ctx);
+  }
+  const bus = busRef.current;
+
+  // Tear down on unmount.
+  useEffect(() => {
+    return () => {
+      busRef.current?.dispose();
+      busRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [maqam, setMaqam] = useState<MaqamPreset>(RAST);
+
+  // Synth params.
+  const [brightness, setBrightness] = useState(0.6);
+  const [decay, setDecay] = useState(0.7);
+  const [body, setBody] = useState(0.3);
+  const [masterVolume, setMasterVolume] = useState(0.6);
+  useEffect(() => {
+    bus.setMasterVolume(masterVolume);
+  }, [masterVolume, bus]);
+
+  const [tweaksOpen, setTweaksOpen] = useState(true);
+
+  const maqamat = useMemo(() => ALL_MAQAMAT, []);
 
   return (
     <div className="app">
       <header className="app-header">
-        <h1>makam_studio</h1>
-        <p className="tagline">
-          Browser-based maqam synthesizer with a qanun-like control surface.
-        </p>
-        <p className="banner">Phase 2 in progress</p>
+        <h1 className="app-header__title">makam_studio</h1>
+        <span className="app-header__maqam">
+          {maqam.name.canonical}
+          {maqam.name.native && (
+            <span className="app-header__maqam-native">{maqam.name.native}</span>
+          )}
+        </span>
+        <span className="app-header__karar">
+          karar
+          <span className="app-header__karar-name">{maqam.karar_perde}</span>
+        </span>
       </header>
 
-      <main className="app-main">
-        <section className="layout-toggles" aria-label="Layout mode">
-          <h2>Layout modes</h2>
-          <div className="tabs" role="tablist">
-            {LAYOUTS.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                role="tab"
-                aria-selected={layout === l.id}
-                className={layout === l.id ? 'tab tab--active' : 'tab'}
-                onClick={() => setLayout(l.id)}
-                disabled
-                title="Non-functional in this scaffold; subsequent commits wire these up."
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
-          <p className="layout-hint">
-            <strong>{LAYOUTS.find((l) => l.id === layout)?.label}:</strong>{' '}
-            {LAYOUTS.find((l) => l.id === layout)?.hint}
-          </p>
-        </section>
+      <MaqamRail maqamat={maqamat} active={maqam} onSelect={setMaqam} />
 
-        <section className="placeholder-pane">
-          <p>
-            The instrument surface lands in subsequent commits. The shared
-            engine (events / router / audio-graph / MIDI / PWA helpers) is
-            already vendor-copied into <code>src/_core/</code> from{' '}
-            <a
-              href="https://github.com/cemergin/musical-core"
-              target="_blank"
-              rel="noreferrer"
-            >
-              musical-core
-            </a>
-            .
-          </p>
-        </section>
+      <main className="main">
+        <QanunInstrument
+          maqam={maqam}
+          audioContext={ctx}
+          destination={bus.input}
+          brightness={brightness}
+          decay={decay}
+          body={body}
+        />
       </main>
 
-      <footer className="app-footer">
-        <a href="../MANIFESTO.md">MANIFESTO</a>
-        <span aria-hidden="true"> · </span>
-        <a
-          href="https://github.com/cemergin/makam_studio"
-          target="_blank"
-          rel="noreferrer"
-        >
-          github
-        </a>
-        <span aria-hidden="true"> · </span>
-        <span className="muted">MIT · offline · no accounts</span>
-      </footer>
+      {tweaksOpen ? (
+        <aside className="tweaks" aria-label="Tweaks">
+          <button
+            type="button"
+            className="tweaks__toggle"
+            onClick={() => setTweaksOpen(false)}
+          >
+            collapse ›
+          </button>
+          {audioState !== 'running' && (
+            <button
+              type="button"
+              className="audio-resume"
+              onClick={() => resume()}
+            >
+              Resume audio ({audioState})
+            </button>
+          )}
+          <SynthControls
+            brightness={brightness}
+            decay={decay}
+            body={body}
+            masterVolume={masterVolume}
+            onBrightness={setBrightness}
+            onDecay={setDecay}
+            onBody={setBody}
+            onMasterVolume={setMasterVolume}
+          />
+          <FxControls bus={bus} />
+        </aside>
+      ) : (
+        <aside className="tweaks tweaks--collapsed" aria-label="Tweaks (collapsed)">
+          <button
+            type="button"
+            className="tweaks__toggle"
+            onClick={() => setTweaksOpen(true)}
+          >
+            ‹ tweaks
+          </button>
+        </aside>
+      )}
     </div>
   );
 }

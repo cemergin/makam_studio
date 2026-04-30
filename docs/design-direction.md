@@ -175,6 +175,16 @@ Beyond the maqam-world instrument timbres (qanun, baglama, tar, dutar, tanbur, n
 
 **Drone configurations addendum.** Drone interval modes ship with stacked-octaves option (root + octave, root + octave + 2 octaves) alongside sa-pa, sa-Ma, single-tone, and triad. Multiple configs available; user chooses; default depends on selected drone voice (vaporwave defaults to root + octave; classical defaults to sa-pa; Byzantine defaults to single-tone).
 
+## Pivot 11: qanun-instrument-first paradigm (supersedes Pivots 1, 2, 6)
+
+Authoritative v1 design now lives in `~/lab/makam_studio/design_notes/design_notes.md`. The split-keyboard / piano-canonical / autoharp-button paradigm is rejected as too removed from the qanun's actual gesture (flip a mandal, pluck a string).
+
+**The instrument**: a vertical stack of 24 strings spanning 2.5 octaves of the active maqam, with each row showing a mandal track (legal retuning positions) | perde + cents readout | pluck button. Live perde-name resolution. Istanbul brutalist styling (slate-blue concrete + Iznik tile band + manuscript gold + pomegranate karar).
+
+**Tradeoff**: less generalizable to non-Turkish traditions (Arabic, Persian, Maghrebi) than the abstract piano-canonical paradigm. Acceptable: the qanun's own home is Turkish/Arabic art-music, so a Turkish-leaning v1 is honest. v2+ adds tradition-specific layout variants if the design proves itself.
+
+**Spec implications**: parts of `docs/spec/v1.md` referencing the split-keyboard layout (§4, §6) are superseded by `design_notes/design_notes.md`. Sections 13 (tuning-data layer), 14 (URL share-link), 15 (IndexedDB schema) remain authoritative.
+
 ## Open questions (will be resolved in Phase 1)
 
 - Project naming — "makam_studio" doesn't fit raga or Byzantine or Maghrebi cleanly. Possible reframe to "modal_studio" or "tuning_studio" if scope expansion holds; defer until v1 ships.

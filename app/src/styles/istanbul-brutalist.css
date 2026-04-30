@@ -1,0 +1,684 @@
+/* Istanbul brutalist palette — round 4 of design_notes §5.4.
+   Damp Bosphorus concrete + Iznik tile + manuscript gold. Warm cream
+   signage type with hard poster shadow. Italic Spectral only for
+   native script + seyir prose. */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Spectral:ital,wght@0,400;1,400;1,500&display=swap');
+
+:root {
+  /* Istanbul-brutalist palette --------------------------------------- */
+  --bg: #8c9498;             /* damp Bosphorus concrete */
+  --bg-grain: rgba(255, 255, 255, 0.04);
+  --tile-deep: #1d6f7a;      /* Iznik deep teal */
+  --tile-turquoise: #4ba3a8;
+  --tile-pomegranate: #d94c3d;
+  --gold: #e8d56a;           /* manuscript gold */
+  --karar: #d94c3d;          /* pomegranate red karar row */
+  --cream: #f4f0e6;          /* cast-concrete signage */
+  --teal-active: #1d6f7a;
+  --saffron: #e8d56a;
+  --text-shadow: 0 3px 0 rgba(0, 0, 0, 0.85);
+  --line: #5a6266;
+  --muted: #6a7378;
+
+  /* Backwards-compat names that musical-core's pwa.tsx + errors.tsx
+     reference (per _core/SYNC.md §"Known issues" #1). */
+  --bg-2: #767e83;
+  --bg-sunk: #6a7278;
+  --fg: var(--cream);
+  --accent: var(--teal-active);
+  --accent-2: var(--saffron);
+
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --serif: 'Spectral', Georgia, serif;
+  --arabic: 'IBM Plex Sans Arabic', 'Noto Naskh Arabic', serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--cream);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  /* Cool dot-grain pattern on the concrete ground. */
+  background-image:
+    radial-gradient(var(--bg-grain) 1px, transparent 1.4px);
+  background-size: 7px 7px;
+  background-attachment: fixed;
+}
+
+/* === App shell ====================================================== */
+
+.app {
+  display: grid;
+  grid-template-columns: 240px 1fr 320px;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  position: relative;
+}
+
+.app::before {
+  /* Iznik tile band — left edge stripe, full height. */
+  content: '';
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 12px;
+  height: 100vh;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--tile-deep) 0,
+    var(--tile-deep) 28px,
+    var(--tile-turquoise) 28px,
+    var(--tile-turquoise) 56px,
+    var(--tile-pomegranate) 56px,
+    var(--tile-pomegranate) 84px
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+.app-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.1rem 1.5rem 0.9rem 2.1rem;
+  border-bottom: 2px solid var(--line);
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.app-header__title {
+  margin: 0;
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 2.2rem;
+  letter-spacing: -0.01em;
+  color: var(--cream);
+  text-shadow: var(--text-shadow);
+  text-transform: lowercase;
+}
+
+.app-header__maqam {
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 1.6rem;
+  color: var(--cream);
+  text-shadow: var(--text-shadow);
+  letter-spacing: 0.02em;
+}
+
+.app-header__maqam-native {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.3rem;
+  margin-left: 0.6rem;
+  color: var(--gold);
+}
+
+.app-header__karar {
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+.app-header__karar-name {
+  color: var(--cream);
+  margin-left: 0.4rem;
+}
+
+/* === Maqam rail ===================================================== */
+
+.rail {
+  grid-column: 1;
+  background: rgba(0, 0, 0, 0.12);
+  padding: 1rem 0.85rem 1rem 1.55rem;
+  border-right: 2px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  overflow-y: auto;
+}
+
+.rail__logo {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.rail__logo-mark {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  background: var(--tile-pomegranate);
+  color: var(--cream);
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: grid;
+  place-items: center;
+  text-shadow: var(--text-shadow);
+}
+
+.rail__logo-text {
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: var(--cream);
+  text-shadow: var(--text-shadow);
+}
+
+.rail__karar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--karar);
+  color: var(--cream);
+  text-shadow: var(--text-shadow);
+}
+
+.rail__karar-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+}
+
+.rail__karar-name {
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.rail__karar-hz {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.rail__maqamat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.rail__maqam {
+  position: relative;
+  display: grid;
+  grid-template-columns: 4px 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem 0.55rem 0;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--line);
+  color: var(--cream);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.rail__maqam:hover {
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.rail__maqam-bar {
+  display: block;
+  width: 4px;
+  height: 100%;
+  background: transparent;
+}
+
+.rail__maqam--active {
+  background: var(--teal-active);
+  border-color: var(--teal-active);
+}
+
+.rail__maqam--active .rail__maqam-bar {
+  background: var(--saffron);
+}
+
+.rail__maqam-name {
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.rail__maqam-native {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--gold);
+  font-size: 0.95rem;
+}
+
+.rail__legend, .rail__seyir {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.7rem;
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--line);
+}
+
+.rail__legend-title, .rail__seyir-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--gold);
+}
+
+.rail__legend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.rail__legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border: 1.5px solid #000;
+}
+
+.rail__legend-swatch--karar { background: var(--karar); }
+.rail__legend-swatch--saffron { background: var(--saffron); }
+.rail__legend-swatch--canonical { background: var(--cream); }
+
+.rail__seyir-text, .rail__seyir-notes {
+  margin: 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--cream);
+  line-height: 1.5;
+}
+
+.rail__seyir-notes {
+  font-size: 0.78rem;
+  font-style: normal;
+  color: var(--gold);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  font-family: var(--sans);
+  font-weight: 600;
+}
+
+/* === Main column (qanun instrument) ================================ */
+
+.main {
+  grid-column: 2;
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+}
+
+.qanun-instrument {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--line);
+  padding: 4px;
+}
+
+.string-row {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 0.8fr;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.4rem 0.7rem;
+  background: rgba(0, 0, 0, 0.18);
+  border-left: 3px solid transparent;
+  min-height: 36px;
+}
+
+.string-row--karar {
+  background: rgba(217, 76, 61, 0.18); /* pomegranate tint */
+  border-left-color: var(--karar);
+}
+
+.string-row--modified {
+  background: rgba(232, 213, 106, 0.18); /* saffron tint */
+  border-left-color: var(--saffron);
+}
+
+.string-row--karar.string-row--modified {
+  background: rgba(232, 213, 106, 0.28);
+}
+
+.string-row--low { opacity: 0.85; }
+.string-row--mid { opacity: 1; }
+.string-row--tiz { opacity: 0.95; }
+
+/* Mandal track */
+.mandal-track {
+  display: grid;
+  grid-template-columns: 24px 1fr 24px;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.mandal-track__step {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--cream);
+  font: inherit;
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.mandal-track__step:hover:not(:disabled) {
+  background: var(--teal-active);
+}
+
+.mandal-track__step:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.mandal-track__rail {
+  position: relative;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--line);
+}
+
+.mandal-track__tick {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  background: var(--cream);
+  opacity: 0.5;
+}
+
+.mandal-track__tick--canonical {
+  width: 2px;
+  background: var(--cream);
+  opacity: 1;
+}
+
+.mandal-track__bar {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 6px;
+  margin-left: -3px;
+  background: var(--saffron);
+  border: 1.5px solid #000;
+}
+
+/* Perde column */
+.string-row__perde {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--sans);
+  font-weight: 700;
+}
+
+.string-row__perde-name {
+  font-size: 0.92rem;
+  color: var(--cream);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.01em;
+}
+
+.string-row__perde-inflection {
+  font-size: 0.72rem;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.string-row__cents {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Pluck button */
+.string-row__pluck {
+  display: block;
+  width: 100%;
+  height: 24px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  position: relative;
+  transition: background 80ms ease;
+}
+
+.string-row__pluck:hover {
+  background: rgba(232, 213, 106, 0.18);
+}
+
+.string-row__pluck:active {
+  background: var(--saffron);
+}
+
+.string-row__pluck-line {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 50%;
+  height: 2px;
+  background: var(--cream);
+  transform: translateY(-50%);
+  opacity: 0.85;
+}
+
+.string-row--karar .string-row__pluck-line { background: var(--karar); opacity: 1; }
+.string-row--modified .string-row__pluck-line { background: var(--saffron); opacity: 1; }
+
+/* === Right rail — tweaks ============================================ */
+
+.tweaks {
+  grid-column: 3;
+  background: rgba(0, 0, 0, 0.12);
+  border-left: 2px solid var(--line);
+  padding: 1rem 0.85rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tweaks--collapsed {
+  grid-column: 3;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tweaks__toggle {
+  align-self: flex-end;
+  padding: 0.4rem 0.7rem;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cream);
+  background: var(--teal-active);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.card {
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--line);
+  padding: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card__title {
+  margin: 0 0 0.2rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--gold);
+  font-weight: 800;
+}
+
+.synth-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.synth-slider__label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--cream);
+}
+
+.synth-slider__value {
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.synth-slider__hint {
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: var(--saffron);
+}
+
+.fx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fx-card {
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--line);
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.fx-card--bypass { opacity: 0.55; }
+
+.fx-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fx-card__title {
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+}
+
+.fx-card__bypass {
+  padding: 0.2rem 0.55rem;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.fx-card__bypass--on {
+  background: var(--teal-active);
+  color: var(--cream);
+}
+
+.fx-card__bypass--off {
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--muted);
+}
+
+.fx-card__params {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.fx-param {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.fx-param__label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  color: var(--cream);
+}
+
+.fx-param__value {
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.fx-param select {
+  font: inherit;
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--cream);
+  border: 1px solid var(--line);
+  padding: 0.2rem 0.4rem;
+}
+
+.audio-resume {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--karar);
+  color: var(--cream);
+  border: 1px solid #000;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+
+.audio-resume:hover { filter: brightness(1.1); }
