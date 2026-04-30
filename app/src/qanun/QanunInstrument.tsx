@@ -8,7 +8,7 @@
 import type { MaqamPreset } from '../tuning/types';
 import { centsToHz } from '../tuning/cents-math';
 import { defaultKararHz } from '../tuning/maqamat';
-import { triggerQanun } from '../audio/qanun-voice';
+import { triggerVoice, type VoiceId } from '../audio/voices';
 import { StringRow } from './StringRow';
 import { useQanunState } from './use-qanun-state';
 
@@ -16,6 +16,8 @@ interface Props {
   maqam: MaqamPreset;
   audioContext: AudioContext;
   destination: AudioNode;
+  /** Selected voice. Pluck dispatches via triggerVoice(voiceId, ...). */
+  voiceId: VoiceId;
   /** Synth params (brightness/decay/body) — read-only here, set by SynthControls. */
   brightness: number;
   decay: number;
@@ -23,7 +25,7 @@ interface Props {
 }
 
 export function QanunInstrument({
-  maqam, audioContext, destination, brightness, decay, body,
+  maqam, audioContext, destination, voiceId, brightness, decay, body,
 }: Props) {
   const state = useQanunState(maqam);
   const kararHz = defaultKararHz(maqam);
@@ -32,7 +34,7 @@ export function QanunInstrument({
     const s = state.strings[stringIndex];
     if (!s) return;
     const hz = centsToHz(kararHz, s.soundingCents);
-    triggerQanun({
+    triggerVoice(voiceId, {
       audioContext,
       destination,
       frequencyHz: hz,
@@ -60,7 +62,7 @@ export function QanunInstrument({
       newMidCents +
       (s.octave === 'low' ? -1200 : s.octave === 'tiz' ? 1200 : 0);
     const hz = centsToHz(kararHz, sounding);
-    triggerQanun({
+    triggerVoice(voiceId, {
       audioContext,
       destination,
       frequencyHz: hz,

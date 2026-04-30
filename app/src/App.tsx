@@ -18,6 +18,7 @@ import { MaqamRail } from './qanun/MaqamRail';
 import { QanunInstrument } from './qanun/QanunInstrument';
 import { SynthControls } from './synth/SynthControls';
 import { FxControls } from './synth/FxControls';
+import type { VoiceId } from './audio/voices';
 
 export function App() {
   const { ctx, state: audioState, resume } = useAudioContext();
@@ -42,6 +43,7 @@ export function App() {
   const [maqam, setMaqam] = useState<MaqamPreset>(RAST);
 
   // Synth params.
+  const [voiceId, setVoiceId] = useState<VoiceId>('qanun');
   const [brightness, setBrightness] = useState(0.6);
   const [decay, setDecay] = useState(0.7);
   const [body, setBody] = useState(0.3);
@@ -77,6 +79,7 @@ export function App() {
           maqam={maqam}
           audioContext={ctx}
           destination={bus.input}
+          voiceId={voiceId}
           brightness={brightness}
           decay={decay}
           body={body}
@@ -102,10 +105,12 @@ export function App() {
             </button>
           )}
           <SynthControls
+            voiceId={voiceId}
             brightness={brightness}
             decay={decay}
             body={body}
             masterVolume={masterVolume}
+            onVoiceId={setVoiceId}
             onBrightness={setBrightness}
             onDecay={setDecay}
             onBody={setBody}
