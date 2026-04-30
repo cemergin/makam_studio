@@ -68,8 +68,11 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
   const transposeRef = useRef<number>(0);
   const heldKeysRef = useRef<Set<string>>(new Set());
   // Pending modifier delta for the NEXT scale-key pluck (auto-clears
-  // on consumption). Independent of any live slides on held notes.
+  // on consumption, or by pressing J = canonical).
   const pendingDeltaRef = useRef<number>(0);
+  // Modifier codes that engaged a LIVE slide (their press-time held
+  // notes were retuned). Used by keyup to know whether to slide back.
+  const sliddenByModRef = useRef<Set<string>>(new Set());
   // Last-played-string-index, for mouse-pluck flash + drone fallback.
   const activeStringRef = useRef<number | null>(null);
 
@@ -198,25 +201,27 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       if (!(code in KEY_TO_MANDAL_DELTA)) return false;
       const delta = KEY_TO_MANDAL_DELTA[code];
 
-      // Slide every held note live (carpma / hammer-on).
       if (heldNotesRef.current.size > 0) {
+        // Notes are ringing → LIVE SLIDE only. Don't touch pendingDelta;
+        // the user is doing carpma / legato on the open note.
         slideHeldNotesBy(delta, 30);
+        sliddenByModRef.current.add(code);
+      } else {
+        // No notes held → arm the next pluck. Sticky until consumed by
+        // a scale-key pluck or cleared by J (canonical = delta 0).
+        pendingDeltaRef.current = delta;
       }
-
-      // Arm pending modifier for the next freshly-pressed key.
-      pendingDeltaRef.current = delta;
       return true;
     };
 
     const handleModifierUp = (code: string): boolean => {
       if (!(code in KEY_TO_MANDAL_DELTA)) return false;
-      // Slide held notes back to their base pitch (pull-off).
-      if (heldNotesRef.current.size > 0) {
+      const wasSliding = sliddenByModRef.current.has(code);
+      sliddenByModRef.current.delete(code);
+      if (wasSliding && heldNotesRef.current.size > 0) {
         slideHeldNotesToBase(40);
       }
-      // Clear pending modifier on release so the next freshly-pressed
-      // key isn't unexpectedly modified.
-      pendingDeltaRef.current = 0;
+      // pendingDelta is untouched on keyup — sticky-arm behaviour.
       return true;
     };
 
@@ -304,6 +309,7 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       releaseDrone();
       transposeRef.current = 0;
       pendingDeltaRef.current = 0;
+      sliddenByModRef.current.clear();
       heldKeysRef.current.clear();
     };
 

@@ -106,19 +106,13 @@ export function startSustainedDrone(t: SustainedDroneTrigger): DroneHandle {
     teardownTimer = setTimeout(teardown, Math.ceil(release * 1000) + 80);
   };
 
-  // Safety net: tear down after 60s even if release was never called.
-  // Drone is meant to be held by Space; this guards against runaway
-  // handles after a tab loses focus.
-  const safety = setTimeout(() => {
-    if (!released) releaseFn();
-  }, 60_000);
-  // Best-effort cleanup of safety timer if release was already called.
-  const origRelease = releaseFn;
+  // No auto-release. Drone sustains indefinitely until the caller
+  // invokes release() (Space keyup, window blur, or component
+  // unmount via the keyboard hook's cleanup all do this).
   const wrappedRelease = () => {
-    clearTimeout(safety);
     if (teardownTimer) clearTimeout(teardownTimer);
     teardownTimer = null;
-    origRelease();
+    releaseFn();
   };
 
   return { release: wrappedRelease };
