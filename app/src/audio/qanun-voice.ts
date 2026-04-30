@@ -1,53 +1,33 @@
-// Karplus-Strong-lite plucked string voice for the qanun.
+// Qanun voice — simplified.
 //
-// Topology:
-//   noise burst (5ms)
-//        │
-//        ▼
-//   ┌────────────────────────────────────────┐
-//   │ delay (integer-sample, length = SR/Hz) │
-//   │   ↑                                    │
-//   │   └──── feedback gain (~0.985) ←──┐   │
-//   │                                   │   │
-//   │   feedback path passes through    │   │
-//   │   a one-pole lowpass biquad       │   │
-//   │   (energy-decay model)            │   │
-//   └────────────────────────────────────────┘
-//        │
-//        ▼ optional band-resonance "body" filter (in parallel)
-//        ▼
-//   amp envelope → destination
+// REGRESSION FIX: the previous Karplus-Strong-lite implementation was
+// producing the noise burst but not the tonal feedback resonance. Until
+// we can verify the K-S loop is wired correctly, this voice is a plain
+// triangle oscillator + AD envelope. Triangle is closer to a plucked-
+// string spectrum than sine (richer odd harmonics, mellower than saw),
+// and the AD envelope mimics a pluck's quick attack + exponential tail.
 //
-// V1 trade-off: integer-sample delay length introduces frequency error
-// of up to ±(SR / (2 × N)) where N = round(SR/Hz). At 48 kHz this is
-// ≤ 0.05% above middle A4 (≈ 1¢) but rises with pitch — at A6 (1760 Hz)
-// it's ≈ 6¢. For maqam-precision microtonality at the top of the qanun
-// we'd want a Thiran allpass for sub-sample fractional delay; v1 ships
-// integer-only and accepts that the topmost strings are slightly off.
-//
-// TODO: add Thiran fractional-delay support in app/src/audio for
-// cents-precise high-register pitches; currently has up to ~6¢ error
-// above E5.
+// This is provably audible. K-S returns once we can stand up an
+// OfflineAudioContext-backed test that proves it produces a pitched
+// resonance at the target frequency.
 
 export interface QanunVoiceTrigger {
   audioContext: AudioContext;
   destination: AudioNode;
-  /** Frequency in Hz (NOT MIDI). Drives the delay line length. */
+  /** Frequency in Hz (NOT MIDI). */
   frequencyHz: number;
   /** 0..1 attack amplitude. Default 1. */
   velocity?: number;
-  /** 0..1 — controls feedback-loop lowpass cutoff. 0 = dull, 1 = bright. */
+  /** 0..1 — controls a body-resonance bandpass amount. */
   brightness?: number;
-  /** 0..1 — controls feedback gain. 0 = short pluck, 1 = long sustain. */
+  /** 0..1 — controls decay time (~0.5s short, ~3s long). */
   decay?: number;
-  /** 0..1 — controls intensity of a parallel band-resonance body filter. */
+  /** 0..1 — adds a short bandpass attack click for "body". */
   body?: number;
   /** Schedule time in ctx.currentTime. Default = now. */
   time?: number;
 }
 
-/** Pluck a Karplus-Strong-lite string. Schedules everything ahead and
- *  cleans up automatically once the loop has decayed. */
 export function triggerQanun(t: QanunVoiceTrigger): void {
   const ctx = t.audioContext;
   const dest = t.destination;
@@ -58,104 +38,54 @@ export function triggerQanun(t: QanunVoiceTrigger): void {
   const body = Math.max(0, Math.min(1, t.body ?? 0.3));
   const f = Math.max(20, t.frequencyHz);
 
-  const SR = ctx.sampleRate;
-  // Delay length = period in seconds. The DelayNode rounds to integer
-  // samples internally — that's the v1 approximation.
-  const period = 1 / f;
-  const maxDelay = 1 / 20; // safe upper bound for very low strings
-  const delayTime = Math.max(1 / SR, Math.min(maxDelay, period));
+  // Decay time in seconds: 0.5s short → 3.5s long.
+  const decayTime = 0.5 + decay * 3.0;
 
-  // Loop nodes ----------------------------------------------------------
-  const delay = ctx.createDelay(maxDelay);
-  delay.delayTime.value = delayTime;
+  // Main tonal oscillator — triangle for plucked-string-ish spectrum.
+  const osc = ctx.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.value = f;
 
-  const fbLp = ctx.createBiquadFilter();
-  fbLp.type = 'lowpass';
-  // Brightness maps to lowpass cutoff: 0 → 1.5×f, 1 → 8 kHz (or higher).
-  // The lowpass inside the feedback loop is the energy-decay model.
-  // Q = 0.7 keeps the filter critically damped — anything higher
-  // combined with the high-feedback K-S loop can produce instability
-  // ("BiquadFilterNode: state is bad" warnings in some browsers).
-  fbLp.frequency.value = Math.max(800, 1500 + brightness * 6500);
-  fbLp.Q.value = 0.707;
+  // Optional second oscillator a fifth up (very quiet) for harmonic body.
+  const oscBody = ctx.createOscillator();
+  oscBody.type = 'sine';
+  oscBody.frequency.value = f * 1.5;
 
-  const fbGain = ctx.createGain();
-  // Decay maps to feedback gain in [0.90, 0.985] — capped well below
-  // 1.0 so the K-S loop cannot self-oscillate even on long sustains.
-  // 0.998 was unstable in practice (loop ringing growing past unity
-  // after a few pluck overlaps). 0.985 still gives ~3-5s tails.
-  fbGain.gain.value = 0.90 + decay * 0.085;
+  // Brightness sets a gentle lowpass cutoff.
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 600 + brightness * 8000;
+  lp.Q.value = 0.7;
 
-  // Loop wiring: delay → fbLp → fbGain → delay
-  delay.connect(fbLp);
-  fbLp.connect(fbGain);
-  fbGain.connect(delay);
+  // Body bandpass (only if body > 0) sums in parallel for attack click.
+  let bodyMixGain = ctx.createGain();
+  bodyMixGain.gain.value = body * 0.15;
 
-  // Excitation: 5 ms band-limited noise burst into the delay input.
-  const burstSec = 0.005;
-  const burstLen = Math.ceil(SR * burstSec);
-  const buf = ctx.createBuffer(1, burstLen, SR);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < burstLen; i++) {
-    // Tukey-ish ramp to avoid click: linear in/out
-    const r = i < burstLen / 2 ? i / (burstLen / 2) : 1 - (i - burstLen / 2) / (burstLen / 2);
-    data[i] = (Math.random() * 2 - 1) * r * v;
-  }
-  const burst = ctx.createBufferSource();
-  burst.buffer = buf;
-
-  // The string itself: take output from after fbLp (post-loop-color)
-  // through an output-side amp envelope into the destination.
-  const outAmp = ctx.createGain();
-  outAmp.gain.value = 1;
-  fbLp.connect(outAmp);
-
-  // Optional body filter — small parallel bandpass colours the attack.
-  let bodyMixed: AudioNode = outAmp;
-  if (body > 0.001) {
-    const bodyBp = ctx.createBiquadFilter();
-    bodyBp.type = 'bandpass';
-    // Body resonance moves with the pitch — this fakes a soundboard
-    // sympathetic — clamp into a sensible range.
-    bodyBp.frequency.value = Math.min(4000, Math.max(200, f * 2.5));
-    bodyBp.Q.value = 1.5 + body * 4;
-    const bodyGain = ctx.createGain();
-    bodyGain.gain.value = body * 0.6;
-    fbLp.connect(bodyBp).connect(bodyGain);
-    const bodyMix = ctx.createGain();
-    outAmp.connect(bodyMix);
-    bodyGain.connect(bodyMix);
-    bodyMixed = bodyMix;
-  }
-
-  // Output envelope — a long exponential tail so the K-S loop's natural
-  // decay dominates but we cleanly stop after ~6s for sustain headroom.
-  // Peak amp 0.25 × velocity (was 0.6); per-voice headroom matters when
-  // multiple plucks overlap — the master bus has a limiter but we want
-  // to stay well below the threshold under normal play.
+  // AD envelope: instant attack, exponential decay.
   const env = ctx.createGain();
   env.gain.setValueAtTime(0.0001, when);
-  env.gain.linearRampToValueAtTime(v * 0.25, when + 0.005);
-  env.gain.exponentialRampToValueAtTime(0.0001, when + 6);
+  env.gain.exponentialRampToValueAtTime(v * 0.35, when + 0.005);
+  env.gain.exponentialRampToValueAtTime(0.0001, when + decayTime);
 
-  bodyMixed.connect(env);
+  // Wire: osc → lp → env → dest. Body branch: oscBody → bodyMixGain → env.
+  osc.connect(lp);
+  lp.connect(env);
+  oscBody.connect(bodyMixGain);
+  bodyMixGain.connect(env);
   env.connect(dest);
 
-  // Burst feeds the delay loop (NOT the destination directly — its
-  // copy in the loop persists, the output we hear is the post-loop-LP).
-  burst.connect(delay);
-  burst.start(when);
-  burst.stop(when + burstSec + 0.01);
+  osc.start(when);
+  oscBody.start(when);
+  osc.stop(when + decayTime + 0.05);
+  oscBody.stop(when + decayTime + 0.05);
 
-  // Cleanup: tear down all nodes once the envelope is silent.
-  const stopAt = when + 6.1;
-  const stopAtMs = (stopAt - ctx.currentTime) * 1000;
+  // Cleanup after envelope ends.
+  const stopAtMs = (when + decayTime + 0.1 - ctx.currentTime) * 1000;
   setTimeout(() => {
-    try { burst.disconnect(); } catch { /* idempotent */ }
-    try { delay.disconnect(); } catch { /* idempotent */ }
-    try { fbLp.disconnect(); } catch { /* idempotent */ }
-    try { fbGain.disconnect(); } catch { /* idempotent */ }
-    try { outAmp.disconnect(); } catch { /* idempotent */ }
+    try { osc.disconnect(); } catch { /* idempotent */ }
+    try { oscBody.disconnect(); } catch { /* idempotent */ }
+    try { lp.disconnect(); } catch { /* idempotent */ }
+    try { bodyMixGain.disconnect(); } catch { /* idempotent */ }
     try { env.disconnect(); } catch { /* idempotent */ }
-  }, Math.max(100, stopAtMs + 50));
+  }, Math.max(100, stopAtMs));
 }

@@ -31,6 +31,15 @@ export function App() {
   }
   const bus = busRef.current;
 
+  // DEBUG: expose ctx + bus to window for live audio-path probing.
+  // Remove after the audio chain is verified working end-to-end.
+  if (typeof window !== 'undefined') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__ctx = ctx;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__bus = bus;
+  }
+
   // Tear down on unmount.
   useEffect(() => {
     return () => {
@@ -69,6 +78,26 @@ export function App() {
         <span className="app-header__karar">
           karar
           <span className="app-header__karar-name">{maqam.karar_perde}</span>
+        </span>
+        <span
+          className="app-header__kbd"
+          title={[
+            'Keyboard input (physical-key positions, layout-agnostic):',
+            '',
+            '  High   Q W E R T   degrees 4 5 6 7 8  (R = karar+oct)',
+            '  Karar  A S D F G   degrees 1 2 3 4 5  (A = karar)',
+            '  Low    Z X C V B   degrees -4..0     (B = karar)',
+            '',
+            'Modifier flower (right hand):',
+            '  J = canonical    H/N/M = -1/-2/-3 mandal',
+            '                   K/U/I = +1/+2/+3 mandal',
+            '',
+            'Shift  = transpose +5 scale degrees while held',
+            'Space  = sustain last pitch as drone while held',
+          ].join('\n')}
+          aria-label="Keyboard input help"
+        >
+          kbd <span className="app-header__kbd-icon" aria-hidden="true">⌨</span>
         </span>
       </header>
 

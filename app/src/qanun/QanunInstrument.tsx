@@ -11,6 +11,7 @@ import { defaultKararHz } from '../tuning/maqamat';
 import { triggerVoice, type VoiceId } from '../audio/voices';
 import { StringRow } from './StringRow';
 import { useQanunState } from './use-qanun-state';
+import { useKeyboardInput } from '../keyboard/use-keyboard-input';
 
 interface Props {
   maqam: MaqamPreset;
@@ -29,6 +30,22 @@ export function QanunInstrument({
 }: Props) {
   const state = useQanunState(maqam);
   const kararHz = defaultKararHz(maqam);
+
+  // Hook up window-level keyboard input — physical-key based so it
+  // works regardless of the user's OS keyboard layout (QWERTY,
+  // AZERTY, Dvorak, …). See `keyboard/keyboard-layout.ts` for the
+  // mapping.
+  useKeyboardInput({
+    audioContext,
+    destination,
+    voiceId,
+    brightness,
+    decay,
+    body,
+    maqam,
+    kararHz,
+    state,
+  });
 
   const pluckString = (stringIndex: number) => {
     const s = state.strings[stringIndex];

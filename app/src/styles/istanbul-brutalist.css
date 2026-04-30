@@ -141,6 +141,27 @@ body {
   margin-left: 0.4rem;
 }
 
+.app-header__kbd {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid var(--line);
+  padding: 0.25rem 0.55rem;
+  border-radius: 2px;
+  cursor: help;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.app-header__kbd-icon {
+  margin-left: 0.35rem;
+  color: var(--cream);
+  font-size: 0.95rem;
+}
+
 /* === Maqam rail ===================================================== */
 
 .rail {
