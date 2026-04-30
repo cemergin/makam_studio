@@ -7,9 +7,15 @@
 //      The active string is the one we just plucked; we remember it
 //      in a ref so the modifier flower can retune it.
 //
-//   2. KEY_TO_MANDAL_DELTA keys → retune the active string ± N mandal
-//      steps (clamped) and re-pluck at the new pitch. KeyJ resets to
-//      the canonical position.
+//   2. KEY_TO_MANDAL_DELTA keys are SILENT — they NEVER trigger the
+//      voice. They do two things at once:
+//        a. Retune the most-recently-played string by ± N mandal
+//           steps (the next pluck of that string lands at the new
+//           pitch).
+//        b. Arm the same delta as a "pending modifier" — the next
+//           DIFFERENT string that is plucked has the same delta
+//           applied before sounding, then the modifier auto-clears.
+//      KeyJ = canonical (delta 0; clears any pending modifier).
 //
 //   3. Space → start a sustained drone on the most-recent pitch; on
 //      keyup, release it (0.5s ramp). Shift → transpose +5 scale
@@ -70,6 +76,10 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
   const droneRef = useRef<DroneHandle | null>(null);
   const transposeRef = useRef<number>(0);
   const heldKeysRef = useRef<Set<string>>(new Set());
+  // Pending modifier delta: applied (and consumed) on the NEXT scale-key
+  // pluck. Cleared after one use, or when J is pressed, or when set
+  // to a fresh value by another modifier press.
+  const pendingDeltaRef = useRef<number>(0);
 
   useEffect(() => {
     const isModifierEvent = (e: KeyboardEvent) =>
@@ -105,6 +115,34 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       const [degree, oct] = applyTranspose(base, transposeRef.current, N);
       const idx = resolveStringIndex(a.maqam, degree, oct);
       if (idx == null) return true; // out-of-range; consume the key anyway
+
+      // Apply pending modifier (if any) to THIS string's mandal index
+      // before the pluck. Modifier auto-clears after consumption.
+      const delta = pendingDeltaRef.current;
+      if (delta !== 0) {
+        const s = a.state.strings[idx];
+        const row = s ? a.maqam.rows.find((r) => r.degree === s.rowDegree) : null;
+        if (s && row) {
+          const legal = row.legal_positions;
+          if (legal.length > 0) {
+            const { index: currentIdx } = nearestMandalPosition(s.currentCentsMid, legal);
+            const stepDir = (delta > 0 ? 1 : -1) as 1 | -1;
+            let targetIdx = currentIdx;
+            for (let i = 0; i < Math.abs(delta); i++) {
+              targetIdx = stepMandalIndex(targetIdx, stepDir, legal);
+            }
+            const stepsToApply = targetIdx - currentIdx;
+            if (stepsToApply !== 0) {
+              const dir = (stepsToApply > 0 ? 1 : -1) as 1 | -1;
+              for (let i = 0; i < Math.abs(stepsToApply); i++) {
+                a.state.stepMandal(idx, dir);
+              }
+            }
+          }
+        }
+        pendingDeltaRef.current = 0;
+      }
+
       playPluck(idx, 0.85);
       return true;
     };
@@ -112,8 +150,17 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
     const handleModifierKey = (code: string) => {
       const a = argsRef.current;
       if (!(code in KEY_TO_MANDAL_DELTA)) return false;
+      const delta = KEY_TO_MANDAL_DELTA[code];
+
+      // Always: arm the next-pluck modifier. J (delta 0) clears any
+      // pending modifier so the next pluck lands at canonical.
+      pendingDeltaRef.current = delta;
+
+      // Also: retune the most-recently-played string in place (visible
+      // in the UI, audible on the NEXT pluck of that string). NO audio
+      // dispatch — modifier keys are silent.
       const active = activeNoteRef.current;
-      if (!active) return true; // no-op if nothing has been played yet
+      if (!active) return true;
       const stringIndex = active.stringIndex;
       const s = a.state.strings[stringIndex];
       if (!s) return true;
@@ -122,12 +169,8 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       const legal = row.legal_positions;
       if (legal.length === 0) return true;
 
-      const delta = KEY_TO_MANDAL_DELTA[code];
-
       if (delta === 0) {
-        // J → reset to canonical position. We step toward the canonical
-        // index in single-step increments (state.stepMandal is the only
-        // mutator we have, and it goes ±1 at a time).
+        // J → reset to canonical on the active string.
         const { index: currentIdx } = nearestMandalPosition(s.currentCentsMid, legal);
         const canonicalIdx = legal.findIndex((p) => p.is_canonical);
         const targetIdx = canonicalIdx >= 0 ? canonicalIdx : currentIdx;
@@ -138,24 +181,16 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
             a.state.stepMandal(stringIndex, step);
           }
         }
-        // Retune the active string but DO NOT re-pluck — modifiers slide
-        // the underlying tuning so the next pluck of this string lands
-        // at the new pitch. (Continuous-slide on the ringing voice is a
-        // future feature; needs the voice to expose a live frequency
-        // handle.)
         return true;
       }
 
-      // ±N steps: apply N stepMandal calls (clamped via stepMandalIndex
-      // semantics — past either end is a no-op for the remaining
-      // increments).
+      // ±N steps applied to the active string.
       const { index: currentIdx } = nearestMandalPosition(s.currentCentsMid, legal);
       const stepDir = (delta > 0 ? 1 : -1) as 1 | -1;
       let targetIdx = currentIdx;
       for (let i = 0; i < Math.abs(delta); i++) {
         targetIdx = stepMandalIndex(targetIdx, stepDir, legal);
       }
-      // Drive the React state to the same target by step-deltas.
       const stepsToApply = targetIdx - currentIdx;
       if (stepsToApply !== 0) {
         const dir = (stepsToApply > 0 ? 1 : -1) as 1 | -1;
@@ -163,9 +198,6 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
           a.state.stepMandal(stringIndex, dir);
         }
       }
-      // Retune-only: don't re-pluck. The change persists in the qanun
-      // state so the next time this string is plucked it sounds at the
-      // new pitch.
       return true;
     };
 
