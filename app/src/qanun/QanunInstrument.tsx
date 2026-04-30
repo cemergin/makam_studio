@@ -18,20 +18,16 @@ interface Props {
   maqam: MaqamPreset;
   audioContext: AudioContext;
   destination: AudioNode;
-  /** Selected voice. Pluck dispatches via triggerVoice(voiceId, ...). */
   voiceId: VoiceId;
-  /** Synth params (brightness/decay/body) — read-only here, set by SynthControls. */
   brightness: number;
-  decay: number;
   body: number;
   /** ADSR envelope (full a/d/s/r). Sustained voices hold at S until release. */
   adsr: ADSR;
-  /** Karar transpose in semitones (default 0). Multiplies kararHz by 2^(n/12). */
   kararSemitoneOffset?: number;
 }
 
 export function QanunInstrument({
-  maqam, audioContext, destination, voiceId, brightness, decay, body,
+  maqam, audioContext, destination, voiceId, brightness, body,
   adsr, kararSemitoneOffset = 0,
 }: Props) {
   const state = useQanunState(maqam);
@@ -69,7 +65,6 @@ export function QanunInstrument({
     destination,
     voiceId,
     brightness,
-    decay,
     body,
     adsr,
     maqam,
@@ -88,7 +83,6 @@ export function QanunInstrument({
       frequencyHz: hz,
       velocity: 0.85,
       brightness,
-      decay,
       body,
       adsr,
     });
@@ -118,7 +112,6 @@ export function QanunInstrument({
       frequencyHz: hz,
       velocity: 0.5,
       brightness: brightness * 0.8,
-      decay: decay * 0.7,
       body,
       adsr,
     });

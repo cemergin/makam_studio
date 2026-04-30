@@ -57,7 +57,6 @@ export function App() {
   // Synth params.
   const [voiceId, setVoiceId] = useState<VoiceId>('qanun');
   const [brightness, setBrightness] = useState(0.6);
-  const [decay, setDecay] = useState(0.7);
   const [body, setBody] = useState(0.3);
   const [masterVolume, setMasterVolume] = useState(0.6);
   useEffect(() => {
@@ -162,7 +161,6 @@ export function App() {
           destination={bus.input}
           voiceId={voiceId}
           brightness={brightness}
-          decay={decay}
           body={body}
           adsr={adsr}
           kararSemitoneOffset={kararSemitoneOffset}
@@ -191,13 +189,11 @@ export function App() {
           <SynthControls
             voiceId={voiceId}
             brightness={brightness}
-            decay={decay}
             body={body}
             masterVolume={masterVolume}
             adsr={adsr}
             onVoiceId={setVoiceId}
             onBrightness={setBrightness}
-            onDecay={setDecay}
             onBody={setBody}
             onMasterVolume={setMasterVolume}
             onAdsr={setAdsr}

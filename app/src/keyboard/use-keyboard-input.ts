@@ -41,7 +41,6 @@ interface UseKeyboardInputArgs {
   destination: AudioNode;
   voiceId: VoiceId;
   brightness: number;
-  decay: number;
   body: number;
   adsr: ADSR;
   maqam: MaqamPreset;
@@ -141,7 +140,6 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         frequencyHz: hz,
         velocity: 0.85,
         brightness: a.brightness,
-        decay: a.decay,
         body: a.body,
         adsr: a.adsr,
       });

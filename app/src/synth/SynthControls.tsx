@@ -7,13 +7,11 @@ import { VOICES, type VoiceId } from '../audio/voices';
 interface Props {
   voiceId: VoiceId;
   brightness: number;
-  decay: number;
   body: number;
   masterVolume: number;
   adsr: ADSR;
   onVoiceId: (v: VoiceId) => void;
   onBrightness: (v: number) => void;
-  onDecay: (v: number) => void;
   onBody: (v: number) => void;
   onMasterVolume: (v: number) => void;
   onAdsr: (v: ADSR) => void;
@@ -90,8 +88,8 @@ function AdsrCurve({ adsr }: { adsr: ADSR }) {
 }
 
 export function SynthControls({
-  voiceId, brightness, decay, body, masterVolume, adsr,
-  onVoiceId, onBrightness, onDecay, onBody, onMasterVolume, onAdsr,
+  voiceId, brightness, body, masterVolume, adsr,
+  onVoiceId, onBrightness, onBody, onMasterVolume, onAdsr,
 }: Props) {
   const setA = (a: number) => onAdsr({ ...adsr, a });
   const setD = (d: number) => onAdsr({ ...adsr, d });
@@ -156,13 +154,6 @@ export function SynthControls({
         value={brightness}
         onChange={onBrightness}
         hint="filter cutoff"
-      />
-      <Slider
-        id="synth-decay"
-        label="legacy decay"
-        value={decay}
-        onChange={onDecay}
-        hint="used by non-qanun voices"
       />
       <Slider
         id="synth-body"
