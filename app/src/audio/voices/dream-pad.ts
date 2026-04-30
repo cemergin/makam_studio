@@ -16,6 +16,9 @@
 // but still well under 10× a K-S equivalent. Peak v × 0.15 keeps the
 // master limiter idle even when stacking 3-4 simultaneous pad notes.
 
+import type { ADSR, VoiceHandle } from '../qanun-voice';
+import { makeVoiceHandle, scheduleAttackDecay } from './_envelope';
+
 export interface DreamPadTrigger {
   audioContext: AudioContext;
   destination: AudioNode;
@@ -23,8 +26,9 @@ export interface DreamPadTrigger {
   velocity?: number;
   time?: number;
   brightness?: number; // shifts formant 2 (2400Hz) up/down
-  decay?: number;      // extends sustain duration
+  decay?: number;      // extends sustain duration (one-shot only)
   body?: number;       // reserved
+  adsr?: ADSR;
 }
 
 export function triggerDreamPad(t: DreamPadTrigger): void {
@@ -124,4 +128,85 @@ export function triggerDreamPad(t: DreamPadTrigger): void {
     try { lfo.disconnect(); } catch { /* idempotent */ }
     try { lfoDepth.disconnect(); } catch { /* idempotent */ }
   }, Math.max(100, stopAtMs + 50));
+}
+
+/** Sustained variant — holds at the ADSR sustain level until release(). */
+export function triggerDreamPadSustained(t: DreamPadTrigger): VoiceHandle {
+  const ctx = t.audioContext;
+  const dest = t.destination;
+  const when = t.time ?? ctx.currentTime;
+  const v = Math.max(0, Math.min(1, t.velocity ?? 1));
+  const brightness = Math.max(0, Math.min(1, t.brightness ?? 0.5));
+  const f = Math.max(20, t.frequencyHz);
+  // Use the user's ADSR but cap min attack to 100ms so it stays pad-like.
+  const baseAdsr: ADSR = t.adsr ?? { a: 1.0, d: 1.0, s: 0.7, r: 1.0 };
+  const adsr: ADSR = { ...baseAdsr, a: Math.max(0.1, baseAdsr.a) };
+  const peak = v * 0.15;
+
+  const oscSine = ctx.createOscillator();
+  oscSine.type = 'sine';
+  oscSine.frequency.value = f;
+  oscSine.detune.value = -5;
+
+  const oscTri = ctx.createOscillator();
+  oscTri.type = 'triangle';
+  oscTri.frequency.value = f;
+  oscTri.detune.value = 5;
+
+  const sumGain = ctx.createGain();
+  sumGain.gain.value = 0.5;
+  oscSine.connect(sumGain);
+  oscTri.connect(sumGain);
+  oscSine.start(when);
+  oscTri.start(when);
+
+  const env = ctx.createGain();
+  scheduleAttackDecay(env, peak, adsr, when);
+  sumGain.connect(env);
+
+  const formant1 = ctx.createBiquadFilter();
+  formant1.type = 'bandpass';
+  formant1.frequency.value = 800;
+  formant1.Q.value = 2;
+  const formant2 = ctx.createBiquadFilter();
+  formant2.type = 'bandpass';
+  formant2.frequency.value = 1800 + brightness * 1200;
+  formant2.Q.value = 1.5;
+
+  const formantSum = ctx.createGain();
+  formantSum.gain.value = 0.5;
+  env.connect(formant1).connect(formantSum);
+  env.connect(formant2).connect(formantSum);
+  const dryGain = ctx.createGain();
+  dryGain.gain.value = 0.3;
+  env.connect(dryGain).connect(formantSum);
+
+  formantSum.connect(dest);
+
+  const cleanup = () => {
+    try { oscSine.stop(); } catch { /* */ }
+    try { oscTri.stop(); } catch { /* */ }
+    try { oscSine.disconnect(); } catch { /* */ }
+    try { oscTri.disconnect(); } catch { /* */ }
+    try { sumGain.disconnect(); } catch { /* */ }
+    try { env.disconnect(); } catch { /* */ }
+    try { formant1.disconnect(); } catch { /* */ }
+    try { formant2.disconnect(); } catch { /* */ }
+    try { formantSum.disconnect(); } catch { /* */ }
+    try { dryGain.disconnect(); } catch { /* */ }
+  };
+
+  const setFrequency = (hz: number, glideMs = 30) => {
+    const now = ctx.currentTime;
+    const tT = Math.max(0.001, glideMs / 1000);
+    const fT = Math.max(20, hz);
+    oscSine.frequency.cancelScheduledValues(now);
+    oscSine.frequency.setValueAtTime(oscSine.frequency.value, now);
+    oscSine.frequency.linearRampToValueAtTime(fT, now + tT);
+    oscTri.frequency.cancelScheduledValues(now);
+    oscTri.frequency.setValueAtTime(oscTri.frequency.value, now);
+    oscTri.frequency.linearRampToValueAtTime(fT, now + tT);
+  };
+
+  return makeVoiceHandle(ctx, env, adsr, cleanup, setFrequency);
 }

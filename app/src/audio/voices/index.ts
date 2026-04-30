@@ -6,9 +6,9 @@
 // passing a different `voiceId`.
 
 import { triggerQanun, triggerQanunSustained, type ADSR, type VoiceHandle } from '../qanun-voice';
-import { triggerVaporPluck } from './vapor-pluck';
-import { triggerSynthwaveSaw } from './synthwave-saw';
-import { triggerDreamPad } from './dream-pad';
+import { triggerVaporPluck, triggerVaporPluckSustained } from './vapor-pluck';
+import { triggerSynthwaveSaw, triggerSynthwaveSawSustained } from './synthwave-saw';
+import { triggerDreamPad, triggerDreamPadSustained } from './dream-pad';
 
 export { triggerVaporPluck } from './vapor-pluck';
 export { triggerSynthwaveSaw } from './synthwave-saw';
@@ -63,20 +63,20 @@ export function triggerVoice(voiceId: VoiceId, t: VoiceTrigger & { adsr?: ADSR }
   }
 }
 
-/** Sustained dispatch — only qanun supports a release handle right
- *  now. Other voices fall back to the one-shot path and return a
- *  no-op handle so callers don't have to special-case. */
+/** Sustained dispatch — every voice now supports a release handle and
+ *  live setFrequency for carpma slides. */
 export function triggerVoiceSustained(
   voiceId: VoiceId,
   t: VoiceTrigger & { adsr?: ADSR },
 ): VoiceHandle {
-  if (voiceId === 'qanun') {
-    return triggerQanunSustained(t);
+  switch (voiceId) {
+    case 'qanun':         return triggerQanunSustained(t);
+    case 'vapor-pluck':   return triggerVaporPluckSustained(t);
+    case 'synthwave-saw': return triggerSynthwaveSawSustained(t);
+    case 'dream-pad':     return triggerDreamPadSustained(t);
+    default: {
+      const _exhaustive: never = voiceId;
+      throw new Error(`Unknown voiceId: ${String(_exhaustive)}`);
+    }
   }
-  triggerVoice(voiceId, t);
-  return {
-    release() { /* no-op */ },
-    setFrequency() { /* no-op */ },
-    get released() { return true; },
-  };
 }

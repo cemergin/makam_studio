@@ -17,6 +17,8 @@
 // width than a chord.
 
 import { tanhCurve } from '../../_core/audio';
+import type { ADSR, VoiceHandle } from '../qanun-voice';
+import { makeVoiceHandle, scheduleAttackDecay } from './_envelope';
 
 export interface SynthwaveSawTrigger {
   audioContext: AudioContext;
@@ -27,6 +29,7 @@ export interface SynthwaveSawTrigger {
   brightness?: number;
   decay?: number;
   body?: number; // unused for synthwave-saw
+  adsr?: ADSR;
 }
 
 export function triggerSynthwaveSaw(t: SynthwaveSawTrigger): void {
@@ -103,4 +106,71 @@ export function triggerSynthwaveSaw(t: SynthwaveSawTrigger): void {
     try { shaper.disconnect(); } catch { /* idempotent */ }
     try { outGain.disconnect(); } catch { /* idempotent */ }
   }, Math.max(100, stopAtMs + 50));
+}
+
+/** Sustained variant — holds at the ADSR sustain level until release(). */
+export function triggerSynthwaveSawSustained(t: SynthwaveSawTrigger): VoiceHandle {
+  const ctx = t.audioContext;
+  const dest = t.destination;
+  const when = t.time ?? ctx.currentTime;
+  const v = Math.max(0, Math.min(1, t.velocity ?? 1));
+  const brightness = Math.max(0, Math.min(1, t.brightness ?? 0.6));
+  const f = Math.max(20, t.frequencyHz);
+  const adsr: ADSR = t.adsr ?? { a: 0.005, d: 0.4, s: 0.5, r: 0.5 };
+  const peak = v * 0.18;
+
+  const detunes = [-3, 0, 3];
+  const oscs: OscillatorNode[] = [];
+  const sumGain = ctx.createGain();
+  sumGain.gain.value = 1 / 3;
+  for (const cents of detunes) {
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.value = f;
+    osc.detune.value = cents;
+    osc.connect(sumGain);
+    osc.start(when);
+    oscs.push(osc);
+  }
+
+  const env = ctx.createGain();
+  scheduleAttackDecay(env, peak, adsr, when);
+  sumGain.connect(env);
+
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = Math.min(18000, 2 * f + brightness * 6000);
+  lp.Q.value = 1.5;
+  env.connect(lp);
+
+  const shaper = ctx.createWaveShaper();
+  shaper.curve = tanhCurve(4096, 5);
+  shaper.oversample = '4x';
+  const driveBoost = ctx.createGain();
+  driveBoost.gain.value = 1.6;
+  lp.connect(driveBoost);
+  driveBoost.connect(shaper);
+  shaper.connect(dest);
+
+  const cleanup = () => {
+    for (const o of oscs) { try { o.stop(); } catch { /* */ } try { o.disconnect(); } catch { /* */ } }
+    try { sumGain.disconnect(); } catch { /* */ }
+    try { env.disconnect(); } catch { /* */ }
+    try { lp.disconnect(); } catch { /* */ }
+    try { driveBoost.disconnect(); } catch { /* */ }
+    try { shaper.disconnect(); } catch { /* */ }
+  };
+
+  const setFrequency = (hz: number, glideMs = 30) => {
+    const now = ctx.currentTime;
+    const tT = Math.max(0.001, glideMs / 1000);
+    const fT = Math.max(20, hz);
+    for (const o of oscs) {
+      o.frequency.cancelScheduledValues(now);
+      o.frequency.setValueAtTime(o.frequency.value, now);
+      o.frequency.linearRampToValueAtTime(fT, now + tT);
+    }
+  };
+
+  return makeVoiceHandle(ctx, env, adsr, cleanup, setFrequency);
 }

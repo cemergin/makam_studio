@@ -14,6 +14,9 @@
 // Headroom discipline: peak gain capped at v × 0.20 so accumulating
 // polyphony stays well below the master limiter threshold.
 
+import type { ADSR, VoiceHandle } from '../qanun-voice';
+import { makeVoiceHandle, scheduleAttackDecay } from './_envelope';
+
 export interface VaporPluckTrigger {
   audioContext: AudioContext;
   destination: AudioNode;
@@ -21,8 +24,9 @@ export interface VaporPluckTrigger {
   velocity?: number;
   time?: number;
   brightness?: number; // optional — biases sweep top end
-  decay?: number;      // optional — extends total tail length
+  decay?: number;      // optional — extends total tail length (one-shot only)
   body?: number;       // unused for vapor-pluck (kept for API symmetry)
+  adsr?: ADSR;
 }
 
 export function triggerVaporPluck(t: VaporPluckTrigger): void {
@@ -135,4 +139,66 @@ export function triggerVaporPluck(t: VaporPluckTrigger): void {
     try { lfoGain2.disconnect(); } catch { /* idempotent */ }
     try { outGain.disconnect(); } catch { /* idempotent */ }
   }, Math.max(100, stopAtMs + 50));
+}
+
+/** Sustained variant — holds at the ADSR sustain level until release().
+ *  Same chorused-saw topology; the envelope is the only difference. */
+export function triggerVaporPluckSustained(t: VaporPluckTrigger): VoiceHandle {
+  const ctx = t.audioContext;
+  const dest = t.destination;
+  const when = t.time ?? ctx.currentTime;
+  const v = Math.max(0, Math.min(1, t.velocity ?? 1));
+  const brightness = Math.max(0, Math.min(1, t.brightness ?? 0.6));
+  const f = Math.max(20, t.frequencyHz);
+  const adsr: ADSR = t.adsr ?? { a: 0.005, d: 0.4, s: 0.5, r: 0.5 };
+  const peak = v * 0.20;
+
+  // 3 saws with detune
+  const oscs: OscillatorNode[] = [];
+  const sumGain = ctx.createGain();
+  sumGain.gain.value = 1 / 3;
+  for (let i = 0; i < 3; i++) {
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    const cents = (Math.random() * 8 - 4) + (i - 1) * 4;
+    osc.detune.value = cents;
+    osc.frequency.value = f;
+    osc.connect(sumGain);
+    osc.start(when);
+    oscs.push(osc);
+  }
+
+  // ADSR env
+  const env = ctx.createGain();
+  scheduleAttackDecay(env, peak, adsr, when);
+  sumGain.connect(env);
+
+  // Static-ish bandpass (sweep doesn't make sense for sustained — fix at midpoint)
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.Q.value = 3;
+  bp.frequency.value = 1500 + brightness * 1000;
+  env.connect(bp);
+
+  bp.connect(dest);
+
+  const cleanup = () => {
+    for (const o of oscs) { try { o.stop(); } catch { /* */ } try { o.disconnect(); } catch { /* */ } }
+    try { sumGain.disconnect(); } catch { /* */ }
+    try { env.disconnect(); } catch { /* */ }
+    try { bp.disconnect(); } catch { /* */ }
+  };
+
+  const setFrequency = (hz: number, glideMs = 30) => {
+    const now = ctx.currentTime;
+    const tT = Math.max(0.001, glideMs / 1000);
+    const fT = Math.max(20, hz);
+    for (const o of oscs) {
+      o.frequency.cancelScheduledValues(now);
+      o.frequency.setValueAtTime(o.frequency.value, now);
+      o.frequency.linearRampToValueAtTime(fT, now + tT);
+    }
+  };
+
+  return makeVoiceHandle(ctx, env, adsr, cleanup, setFrequency);
 }
