@@ -1099,7 +1099,7 @@ input[type='range'] {
 /* Console module shell */
 .console-module {
   position: relative;
-  flex: 1 1 0;
+  flex: 0 0 auto;            /* size to content, don't stretch */
   min-width: 0;
   padding: 6px 10px;
   border-right: 1px solid rgba(247, 240, 220, 0.08);
@@ -1118,9 +1118,15 @@ input[type='range'] {
 }
 .console-module__body {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
+  flex-direction: column;
+  gap: 4px;
   align-items: flex-start;
+}
+.console-module__row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px 8px;
+  align-items: flex-end;
 }
 .console-module__arrow {
   position: absolute;
