@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 
 const SCALE_KEYS = ['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyA','KeyS','KeyD','KeyF','KeyG','KeyQ','KeyW','KeyE','KeyR','KeyT'];
-const FLOWER_KEYS = ['KeyJ','KeyH','KeyN','KeyM','KeyK','KeyU','KeyI'];
+const FLOWER_KEYS = ['KeyJ','KeyH','KeyN','KeyM','KeyK','KeyU','KeyI','KeyL'];
 const SPECIAL_KEYS = ['Space','ShiftLeft','ShiftRight'];
 const ALL_KEYS = new Set([...SCALE_KEYS, ...FLOWER_KEYS, ...SPECIAL_KEYS]);
 
@@ -17,7 +17,7 @@ const LABEL: Record<string, string> = {
   KeyZ: 'Z', KeyX: 'X', KeyC: 'C', KeyV: 'V', KeyB: 'B',
   KeyA: 'A', KeyS: 'S', KeyD: 'D', KeyF: 'F', KeyG: 'G',
   KeyQ: 'Q', KeyW: 'W', KeyE: 'E', KeyR: 'R', KeyT: 'T',
-  KeyJ: 'J', KeyH: 'H', KeyN: 'N', KeyM: 'M', KeyK: 'K', KeyU: 'U', KeyI: 'I',
+  KeyJ: 'J', KeyH: 'H', KeyN: 'N', KeyM: 'M', KeyK: 'K', KeyU: 'U', KeyI: 'I', KeyL: 'L',
   Space: '␣', ShiftLeft: '⇧', ShiftRight: '⇧',
 };
 
@@ -93,6 +93,10 @@ export function KeyboardOverlay() {
         <div className="kbo__row">
           <KeyCap code="KeyH" role="flower" /><KeyCap code="KeyN" role="flower" /><KeyCap code="KeyM" role="flower" />
           <span className="kbo__hint">−1 / −2 / −3</span>
+        </div>
+        <div className="kbo__row">
+          <KeyCap code="KeyL" role="flower" />
+          <span className="kbo__hint">pin / unpin active string</span>
         </div>
       </div>
       <div className="kbo__group" aria-label="Specials">

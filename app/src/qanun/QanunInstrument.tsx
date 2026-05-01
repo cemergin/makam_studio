@@ -9,6 +9,7 @@ import { useCallback, useRef, useState } from 'react';
 import type { MaqamPreset } from '../tuning/types';
 import { centsToHz } from '../tuning/cents-math';
 import { defaultKararHz } from '../tuning/maqamat';
+import { lookupPerdeCents } from '../tuning/perde-dictionary';
 import { triggerVoice, type VoiceId, type ADSR } from '../audio/voices';
 import { StringRow } from './StringRow';
 import { useQanunState } from './use-qanun-state';
@@ -32,6 +33,10 @@ export function QanunInstrument({
 }: Props) {
   const state = useQanunState(maqam);
   const kararHz = defaultKararHz(maqam) * Math.pow(2, kararSemitoneOffset / 12);
+  // Absolute cents of the maqam's karar perde above Rast — used by the
+  // perde dictionary to label notes correctly for non-Rast karars
+  // (Dügâh, Segâh, etc.).
+  const kararCentsAboveRast = lookupPerdeCents(maqam.karar_perde);
 
   // Two visual layers for played strings:
   //   - flashIndices  → 250ms saffron pulse on every trigger (mouse + key)
@@ -135,6 +140,7 @@ export function QanunInstrument({
             s={s}
             legal={state.legalPositions(s.index)}
             currentIndex={state.currentMandalIndex(s.index)}
+            kararCentsAboveRast={kararCentsAboveRast}
             isKarar={isKarar}
             isFlashing={flashIndices.has(s.index)}
             isSustaining={sustainingIndices.has(s.index)}

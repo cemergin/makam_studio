@@ -80,6 +80,10 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
   // source modifier code so we know whether to revert on its keyup
   // (only if still held when the note starts).
   const pendingDeltaRef = useRef<{ delta: number; source: string | null }>({ delta: 0, source: null });
+  // Pinned positions per stringIndex. KeyL toggles a pin on the active
+  // string at its current mandal index; while pinned, releaseScaleNote
+  // reverts to that pinned index instead of the maqam canonical.
+  const pinnedMandalRef = useRef<Map<number, number>>(new Map());
   // Modifier codes that engaged a LIVE slide (their press-time held
   // notes were retuned). Used by keyup to know whether to slide back.
   const sliddenByModRef = useRef<Set<string>>(new Set());
@@ -207,7 +211,10 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
 
       if (!otherHolderExists) {
         const a = argsRef.current;
-        const stepsBack = note.baseMandalIdx - note.currentMandalIdx;
+        // If the string is pinned, revert to the pinned index. Else
+        // revert to the note's baseMandalIdx (canonical at note-start).
+        const targetIdx = pinnedMandalRef.current.get(note.stringIndex) ?? note.baseMandalIdx;
+        const stepsBack = targetIdx - note.currentMandalIdx;
         if (stepsBack !== 0) {
           const dir = (stepsBack > 0 ? 1 : -1) as 1 | -1;
           for (let i = 0; i < Math.abs(stepsBack); i++) {
@@ -385,6 +392,52 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       emitSustainingChange();
     };
 
+    /** KeyL toggles pin on the active (last-played) string. Pinning
+     *  fixes the string's current mandal position so future releases
+     *  don't revert to maqam-canonical — they snap to the pinned
+     *  position. Toggling again unpins and resets to maqam-canonical. */
+    const handlePinKey = (code: string): boolean => {
+      if (code !== 'KeyL') return false;
+      const a = argsRef.current;
+      const stringIndex = activeStringRef.current;
+      if (stringIndex == null) return true;
+      const s = a.state.strings[stringIndex];
+      if (!s) return true;
+      const row = a.maqam.rows.find((r) => r.degree === s.rowDegree);
+      if (!row) return true;
+      const legal = row.legal_positions;
+      if (legal.length === 0) return true;
+      const { index: cur } = nearestMandalPosition(s.currentCentsMid, legal);
+
+      if (pinnedMandalRef.current.has(stringIndex)) {
+        // Already pinned → unpin and slide state to maqam canonical.
+        pinnedMandalRef.current.delete(stringIndex);
+        const canonicalIdx = legal.findIndex((p) => p.is_canonical);
+        const target = canonicalIdx >= 0 ? canonicalIdx : cur;
+        const diff = target - cur;
+        if (diff !== 0) {
+          const dir = (diff > 0 ? 1 : -1) as 1 | -1;
+          for (let i = 0; i < Math.abs(diff); i++) {
+            a.state.stepMandal(stringIndex, dir);
+          }
+        }
+        // Update any held note on this string so its currentMandalIdx
+        // tracks the new state.
+        heldNotesRef.current.forEach((n) => {
+          if (n.stringIndex === stringIndex) n.currentMandalIdx = target;
+        });
+      } else {
+        // Pin at current position. Held notes' baseMandalIdx is updated
+        // so future releases revert to the pin instead of the original
+        // canonical (avoids fighting between pin and base on release).
+        pinnedMandalRef.current.set(stringIndex, cur);
+        heldNotesRef.current.forEach((n) => {
+          if (n.stringIndex === stringIndex) n.baseMandalIdx = cur;
+        });
+      }
+      return true;
+    };
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return;
       if (isOsModifierEvent(e)) return;
@@ -402,6 +455,10 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         return;
       }
 
+      if (handlePinKey(e.code)) {
+        heldKeysRef.current.add(e.code);
+        return;
+      }
       if (handleModifierDown(e.code)) {
         heldKeysRef.current.add(e.code);
         return;

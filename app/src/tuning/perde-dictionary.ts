@@ -74,11 +74,13 @@ const PERDES: PerdeEntry[] = (() => {
 /** Names for the low and tiz registers — culturally meaningful when
  *  a perde shifts an octave (Hüseynî → Muhayyer, Segâh → Tîz Segâh). */
 const TIZ_RENAME: Record<string, string> = {
-  'Hüseynî': 'Muhayyer',
-  'Segâh':   'Tîz Segâh',
-  'Çârgâh':  'Tîz Çârgâh',
-  'Bûselik': 'Tîz Bûselik',
-  'Hicaz':   'Şehnaz',
+  'Rast':     'Gerdâniye',
+  'Dügâh':    'Muhayyer',
+  'Hüseynî':  'Muhayyer',  // both name the high A
+  'Segâh':    'Tîz Segâh',
+  'Çârgâh':   'Tîz Çârgâh',
+  'Bûselik':  'Tîz Bûselik',
+  'Hicaz':    'Şehnaz',
   'Nim Hicaz': 'Nim Şehnaz',
 };
 
@@ -104,18 +106,54 @@ export interface ResolvedPerde {
   inflection: number;
 }
 
-/** Resolve an arbitrary cents-from-karar (assumes Rast-anchored, but
- *  callers can shift first) to the closest canonical perde + octave +
- *  inflection. The "karar" is treated as Rast for naming purposes. */
-export function resolvePerde(centsFromKarar: number): ResolvedPerde {
-  // Determine register from the unreduced cents.
+/** Look up a perde's cents-above-Rast by name. Returns 0 if not found
+ *  (treating unknown karar perde as Rast-equivalent — safe fallback). */
+export function lookupPerdeCents(name: string): number {
+  // Walk the dictionary; case-sensitive match on the canonical name.
+  for (const p of PERDES) {
+    if (p.name === name) return p.centsAboveRast;
+  }
+  // Try LOW_RENAME / TIZ_RENAME source-side lookups so that aliases like
+  // "Yegâh" (= low Dügâh) or "Muhayyer" (= tiz Dügâh) resolve to their
+  // mid-octave canonical's cents. Useful when a maqam's karar_perde is
+  // actually a register-renamed alias.
+  for (const [base, low] of Object.entries(LOW_RENAME)) {
+    if (low === name) {
+      const baseCents = lookupPerdeCents(base);
+      return baseCents - 1200;
+    }
+  }
+  for (const [base, tiz] of Object.entries(TIZ_RENAME)) {
+    if (tiz === name) {
+      const baseCents = lookupPerdeCents(base);
+      return baseCents + 1200;
+    }
+  }
+  return 0;
+}
+
+/** Resolve an arbitrary cents-from-karar to the closest canonical perde +
+ *  octave + inflection.
+ *
+ *  `kararCentsAboveRast`: the absolute cents of the maqam's karar perde
+ *  above Rast (the dictionary's reference). For Rast karar it's 0; for
+ *  Uşşâk / Hüseynî / Saba / Bayati / Hicaz (all karar=Dügâh) it's ~204.
+ *  The lookup is on the ABSOLUTE pitch (centsFromKarar + offset) so a
+ *  Dügâh-karar maqam labels its karar as "Dügâh", not "Rast". */
+export function resolvePerde(centsFromKarar: number, kararCentsAboveRast = 0): ResolvedPerde {
+  // Player-relative register — based on cents from karar (where the
+  // hand is on the qanun, anchored to karar regardless of which perde
+  // karar is).
   let octave: 'low' | 'mid' | 'tiz';
   if (centsFromKarar < -50) octave = 'low';
   else if (centsFromKarar >= 1150) octave = 'tiz';
   else octave = 'mid';
 
-  // Reduce to [0, 1200) for matching.
-  let reduced = centsFromKarar;
+  // Absolute cents above Rast = centsFromKarar + kararCentsAboveRast.
+  // Reduce to [0, 1200) for matching against the dictionary (which is
+  // indexed by central-octave cents above Rast).
+  const absoluteCents = centsFromKarar + kararCentsAboveRast;
+  let reduced = absoluteCents;
   while (reduced < 0) reduced += 1200;
   while (reduced >= 1200) reduced -= 1200;
 

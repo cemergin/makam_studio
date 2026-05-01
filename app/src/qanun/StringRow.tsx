@@ -10,6 +10,9 @@ interface Props {
   s: QanunString;
   legal: readonly MandalPosition[];
   currentIndex: number;
+  /** Karar perde's cents above Rast — shifts perde names so a
+   *  Dügâh-karar maqam labels its karar as "Dügâh", not "Rast". */
+  kararCentsAboveRast: number;
   isKarar: boolean;
   isFlashing?: boolean;
   /** True while a held key is sounding this string. Persistent glow. */
@@ -19,9 +22,9 @@ interface Props {
 }
 
 export function StringRow({
-  s, legal, currentIndex, isKarar, isFlashing, isSustaining, onStep, onPluck,
+  s, legal, currentIndex, kararCentsAboveRast, isKarar, isFlashing, isSustaining, onStep, onPluck,
 }: Props) {
-  const perde = resolvePerde(s.soundingCents);
+  const perde = resolvePerde(s.soundingCents, kararCentsAboveRast);
   const inflectionStr =
     perde.inflection === 0
       ? ''
