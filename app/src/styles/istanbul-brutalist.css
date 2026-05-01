@@ -1253,3 +1253,21 @@ input[type='range'] {
   color: var(--saffron, #f4a52a);
 }
 .fx-block__params { display: flex; gap: 6px; }
+
+/* Top-console layout — no right tweaks panel */
+.app--top-console {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    "header   header"
+    "console  console"
+    "rail     main";
+  height: 100vh;
+  overflow: hidden;
+}
+.app--top-console .app-header { grid-area: header; }
+.app--top-console .console    { grid-area: console; }
+.app--top-console .maqam-rail { grid-area: rail; overflow-y: auto; }
+.app--top-console .main       { grid-area: main; overflow-y: auto; }
+

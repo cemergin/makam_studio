@@ -78,6 +78,10 @@ interface UseKeyboardInputArgs {
   filterEnv: FilterEnv;
   lfo1: LfoConfig;
   lfo2: LfoConfig;
+  /** Octave offset (-2..+2). Threaded into machine triggers. */
+  octaveOffset?: number;
+  /** Machine-specific params keyed by ParamSpec.name from MACHINE_PARAMS. */
+  machineParams?: import('../audio/machines').MachineParamValues;
   maqam: MaqamPreset;
   kararHz: number;
   state: QanunState;
@@ -184,6 +188,8 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         filterEnv: a.filterEnv,
         lfo1: a.lfo1,
         lfo2: a.lfo2,
+        octaveOffset: a.octaveOffset,
+        params: a.machineParams,
       });
 
       heldNotesRef.current.set(code, {

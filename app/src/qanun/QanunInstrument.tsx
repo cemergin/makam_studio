@@ -13,6 +13,7 @@ import {
   triggerMachine,
   triggerMachineSustained,
   type MachineId,
+  type MachineParamValues,
   type ADSR,
   type FilterConfig,
   type FilterEnv,
@@ -38,6 +39,10 @@ interface Props {
   filterEnv: FilterEnv;
   lfo1: LfoConfig;
   lfo2: LfoConfig;
+  /** Octave offset (-2..+2). Multiplies pitch by 2^octaveOffset at trigger. */
+  octaveOffset?: number;
+  /** Machine-specific params keyed by ParamSpec.name from MACHINE_PARAMS. */
+  machineParams?: MachineParamValues;
   kararSemitoneOffset?: number;
   /** Number keys 1..9 select a maqam by its index in the rail. */
   onMaqamSelect?: (index: number) => void;
@@ -48,6 +53,7 @@ interface Props {
 export function QanunInstrument({
   maqam, audioContext, destination, machineId, brightness, body,
   adsr, filter, filterEnv, lfo1, lfo2,
+  octaveOffset = 0, machineParams,
   kararSemitoneOffset = 0, onMaqamSelect, droneOctave = 0,
 }: Props) {
   const state = useQanunState(maqam);
@@ -102,6 +108,8 @@ export function QanunInstrument({
     filterEnv,
     lfo1,
     lfo2,
+    octaveOffset,
+    machineParams,
     maqam,
     kararHz,
     state,
@@ -138,6 +146,8 @@ export function QanunInstrument({
       filterEnv,
       lfo1,
       lfo2,
+      octaveOffset,
+      params: machineParams,
     });
 
     const id = `mouse:${stringIndex}`;
@@ -158,7 +168,8 @@ export function QanunInstrument({
     flashString(stringIndex);
   }, [
     state.strings, maqam, kararHz, machineId, audioContext, destination,
-    brightness, body, adsr, filter, filterEnv, lfo1, lfo2, flashString,
+    brightness, body, adsr, filter, filterEnv, lfo1, lfo2,
+    octaveOffset, machineParams, flashString,
   ]);
 
   const releaseString = useCallback((stringIndex: number) => {
@@ -191,6 +202,8 @@ export function QanunInstrument({
       filterEnv,
       lfo1,
       lfo2,
+      octaveOffset,
+      params: machineParams,
     });
   };
 
