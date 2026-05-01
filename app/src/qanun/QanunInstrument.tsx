@@ -33,11 +33,12 @@ export function QanunInstrument({
   const state = useQanunState(maqam);
   const kararHz = defaultKararHz(maqam) * Math.pow(2, kararSemitoneOffset / 12);
 
-  // Track recently-plucked string indices for the "light up" flash on
-  // every trigger (both mouse and keyboard). 250ms saffron flash via
-  // the `string-row--flashing` class.
+  // Two visual layers for played strings:
+  //   - flashIndices  → 250ms saffron pulse on every trigger (mouse + key)
+  //   - sustainingIndices → persistent glow while a key is held
   const [flashIndices, setFlashIndices] = useState<ReadonlySet<number>>(new Set());
   const flashTimers = useRef<Map<number, number>>(new Map());
+  const [sustainingIndices, setSustainingIndices] = useState<ReadonlySet<number>>(new Set());
 
   const flashString = useCallback((stringIndex: number) => {
     setFlashIndices((prev) => {
@@ -71,6 +72,7 @@ export function QanunInstrument({
     kararHz,
     state,
     onPluck: flashString,
+    onSustainingChange: setSustainingIndices,
   });
 
   const pluckString = (stringIndex: number) => {
@@ -135,6 +137,7 @@ export function QanunInstrument({
             currentIndex={state.currentMandalIndex(s.index)}
             isKarar={isKarar}
             isFlashing={flashIndices.has(s.index)}
+            isSustaining={sustainingIndices.has(s.index)}
             onStep={(step) => previewMandalStep(s.index, step)}
             onPluck={() => pluckString(s.index)}
           />

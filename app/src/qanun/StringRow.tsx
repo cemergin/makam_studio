@@ -12,11 +12,15 @@ interface Props {
   currentIndex: number;
   isKarar: boolean;
   isFlashing?: boolean;
+  /** True while a held key is sounding this string. Persistent glow. */
+  isSustaining?: boolean;
   onStep: (step: 1 | -1) => void;
   onPluck: () => void;
 }
 
-export function StringRow({ s, legal, currentIndex, isKarar, isFlashing, onStep, onPluck }: Props) {
+export function StringRow({
+  s, legal, currentIndex, isKarar, isFlashing, isSustaining, onStep, onPluck,
+}: Props) {
   const perde = resolvePerde(s.soundingCents);
   const inflectionStr =
     perde.inflection === 0
@@ -30,6 +34,7 @@ export function StringRow({ s, legal, currentIndex, isKarar, isFlashing, onStep,
     isKarar ? 'string-row--karar' : '',
     s.isModified ? 'string-row--modified' : '',
     isFlashing ? 'string-row--flashing' : '',
+    isSustaining ? 'string-row--sustaining' : '',
     `string-row--${s.octave}`,
   ]
     .filter(Boolean)

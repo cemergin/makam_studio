@@ -48,6 +48,9 @@ interface UseKeyboardInputArgs {
   state: QanunState;
   /** Called whenever a keyboard pluck fires, with the string index. */
   onPluck?: (stringIndex: number) => void;
+  /** Called whenever the set of currently-sustaining string indices
+   *  changes (note start/end). Use to drive a persistent visual. */
+  onSustainingChange?: (indices: ReadonlySet<number>) => void;
 }
 
 interface HeldNote {
@@ -57,6 +60,11 @@ interface HeldNote {
   currentHz: number;          // current sounding pitch (after any modifier slide)
   baseMandalIdx: number;      // mandal index at keydown time
   currentMandalIdx: number;   // current mandal index (drives state visualization)
+  /** If this note was modified via pendingDelta from a modifier that was
+   *  STILL HELD at note-start time, track which modifier code so its
+   *  keyup can revert the modification. null = modification is sticky
+   *  (the modifier was already released before the note started). */
+  pendingSource: string | null;
 }
 
 export function useKeyboardInput(args: UseKeyboardInputArgs): void {
@@ -68,9 +76,10 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
   const droneRef = useRef<DroneHandle | null>(null);
   const transposeRef = useRef<number>(0);
   const heldKeysRef = useRef<Set<string>>(new Set());
-  // Pending modifier delta for the NEXT scale-key pluck (auto-clears
-  // on consumption, or by pressing J = canonical).
-  const pendingDeltaRef = useRef<number>(0);
+  // Pending modifier delta for the NEXT scale-key pluck. Tracks the
+  // source modifier code so we know whether to revert on its keyup
+  // (only if still held when the note starts).
+  const pendingDeltaRef = useRef<{ delta: number; source: string | null }>({ delta: 0, source: null });
   // Modifier codes that engaged a LIVE slide (their press-time held
   // notes were retuned). Used by keyup to know whether to slide back.
   const sliddenByModRef = useRef<Set<string>>(new Set());
@@ -118,16 +127,19 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
 
       // Apply pending modifier (if any) BEFORE the keydown sounds.
       // This ALSO updates the qanun state so the visualization moves.
+      // If the source modifier is STILL HELD, track its code so the
+      // modifier's keyup can auto-revert the note.
       let initialMandalIdx = baseMandalIdx;
       let initialCents = baseCents;
-      if (pendingDeltaRef.current !== 0 && legal.length > 0) {
-        const delta = pendingDeltaRef.current;
+      let pendingSource: string | null = null;
+      const pending = pendingDeltaRef.current;
+      if (pending.delta !== 0 && legal.length > 0) {
+        const delta = pending.delta;
         const dir = (delta > 0 ? 1 : -1) as 1 | -1;
         let target = baseMandalIdx;
         for (let i = 0; i < Math.abs(delta); i++) {
           target = stepMandalIndex(target, dir, legal);
         }
-        // Drive state to the modified position so labels update.
         const diff = target - baseMandalIdx;
         if (diff !== 0) {
           const stepDir = (diff > 0 ? 1 : -1) as 1 | -1;
@@ -137,7 +149,13 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         }
         initialMandalIdx = target;
         initialCents = soundingCentsAt(stringIndex, target);
-        pendingDeltaRef.current = 0;
+        // If the modifier that armed this delta is STILL held when this
+        // note starts, mark it as the revert-source. If already released
+        // (tap-armed-then-played), the modification is sticky.
+        if (pending.source && heldKeysRef.current.has(pending.source)) {
+          pendingSource = pending.source;
+        }
+        pendingDeltaRef.current = { delta: 0, source: null };
       }
       const hz = centsToHz(a.kararHz, initialCents);
       const baseHz = centsToHz(a.kararHz, baseCents);
@@ -159,9 +177,11 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         currentHz: hz,
         baseMandalIdx,
         currentMandalIdx: initialMandalIdx,
+        pendingSource,
       });
       activeStringRef.current = stringIndex;
       a.onPluck?.(stringIndex);
+      emitSustainingChange();
     };
 
     const releaseScaleNote = (code: string) => {
@@ -169,6 +189,19 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       if (!note) return;
       note.handle.release();
       heldNotesRef.current.delete(code);
+      emitSustainingChange();
+    };
+
+    /** Emit a snapshot of currently-sustaining stringIndices. Multiple
+     *  keys can map to the same string (e.g. KeyG and KeyQ both = degree
+     *  5 in mid octave); the set deduplicates so the visual stays on
+     *  until the LAST holder releases. */
+    const emitSustainingChange = () => {
+      const a = argsRef.current;
+      if (!a.onSustainingChange) return;
+      const indices = new Set<number>();
+      heldNotesRef.current.forEach((note) => indices.add(note.stringIndex));
+      a.onSustainingChange(indices);
     };
 
     const handleScaleDown = (code: string): boolean => {
@@ -244,14 +277,13 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       const delta = KEY_TO_MANDAL_DELTA[code];
 
       if (heldNotesRef.current.size > 0) {
-        // Notes are ringing → LIVE SLIDE only. Don't touch pendingDelta;
-        // the user is doing carpma / legato on the open note.
+        // Notes are ringing → LIVE SLIDE only.
         slideHeldNotesBy(delta, 30);
         sliddenByModRef.current.add(code);
       } else {
-        // No notes held → arm the next pluck. Sticky until consumed by
-        // a scale-key pluck or cleared by J (canonical = delta 0).
-        pendingDeltaRef.current = delta;
+        // No notes held → arm. Track the source so we know whether
+        // to auto-revert if user holds modifier through next note-on.
+        pendingDeltaRef.current = { delta, source: code };
       }
       return true;
     };
@@ -263,8 +295,36 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       if (wasSliding && heldNotesRef.current.size > 0) {
         slideHeldNotesToBase(40);
       }
-      // pendingDelta is untouched on keyup — sticky-arm behaviour.
+      // Auto-revert held notes whose pending-arm source was THIS modifier
+      // (user held modifier through note-start; modifier release should
+      // pull the note back to its canonical pitch).
+      revertHeldNotesWithPendingSource(code, 40);
+      // Pending arm clears if its source modifier just released — no
+      // hanging arm after the modifier is gone.
+      if (pendingDeltaRef.current.source === code) {
+        pendingDeltaRef.current = { delta: 0, source: null };
+      }
       return true;
+    };
+
+    /** Slide back any held notes that were originally modified via
+     *  pendingDelta from `code`. Clears their pendingSource. */
+    const revertHeldNotesWithPendingSource = (code: string, glideMs = 40) => {
+      const a = argsRef.current;
+      heldNotesRef.current.forEach((note) => {
+        if (note.pendingSource !== code) return;
+        const stepsBack = note.baseMandalIdx - note.currentMandalIdx;
+        if (stepsBack !== 0) {
+          const dir = (stepsBack > 0 ? 1 : -1) as 1 | -1;
+          for (let i = 0; i < Math.abs(stepsBack); i++) {
+            a.state.stepMandal(note.stringIndex, dir);
+          }
+        }
+        note.currentMandalIdx = note.baseMandalIdx;
+        note.currentHz = note.baseHz;
+        note.handle.setFrequency(note.baseHz, glideMs);
+        note.pendingSource = null;
+      });
     };
 
     const startDrone = () => {
@@ -295,6 +355,7 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
     const releaseAllNotes = () => {
       heldNotesRef.current.forEach((note) => note.handle.release());
       heldNotesRef.current.clear();
+      emitSustainingChange();
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -350,7 +411,7 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       releaseAllNotes();
       releaseDrone();
       transposeRef.current = 0;
-      pendingDeltaRef.current = 0;
+      pendingDeltaRef.current = { delta: 0, source: null };
       sliddenByModRef.current.clear();
       heldKeysRef.current.clear();
     };
