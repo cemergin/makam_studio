@@ -54,10 +54,10 @@ export function FilterModule({
       </div>
       <div className="console-module__row">
         <span className="console-module__sub-label">ENV</span>
-        <Knob label="A" size={32} value={filterEnv.a} min={0.001} max={2}    defaultValue={0.005} onChange={(v) => onFilterEnv({ ...filterEnv, a: v })} />
-        <Knob label="D" size={32} value={filterEnv.d} min={0.001} max={4}    defaultValue={0.8}   onChange={(v) => onFilterEnv({ ...filterEnv, d: v })} />
-        <Knob label="S" size={32} value={filterEnv.s} min={0}     max={1}    defaultValue={0}     onChange={(v) => onFilterEnv({ ...filterEnv, s: v })} />
-        <Knob label="R" size={32} value={filterEnv.r} min={0.001} max={4}    defaultValue={0.2}   onChange={(v) => onFilterEnv({ ...filterEnv, r: v })} />
+        <Knob label="A" value={filterEnv.a} min={0.001} max={2}    defaultValue={0.005} onChange={(v) => onFilterEnv({ ...filterEnv, a: v })} />
+        <Knob label="D" value={filterEnv.d} min={0.001} max={4}    defaultValue={0.8}   onChange={(v) => onFilterEnv({ ...filterEnv, d: v })} />
+        <Knob label="S" value={filterEnv.s} min={0}     max={1}    defaultValue={0}     onChange={(v) => onFilterEnv({ ...filterEnv, s: v })} />
+        <Knob label="R" value={filterEnv.r} min={0.001} max={4}    defaultValue={0.2}   onChange={(v) => onFilterEnv({ ...filterEnv, r: v })} />
       </div>
     </ConsoleModule>
   );

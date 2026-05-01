@@ -56,7 +56,7 @@ function from01(t: number, min: number, max: number, log: boolean): number {
 export function Knob({
   value, min, max, defaultValue = min, step,
   log = false, label, unit = '', format,
-  onChange, modulated = false, size = 42,
+  onChange, modulated = false, size = 36,
 }: KnobProps) {
   const elRef = useRef<HTMLButtonElement | null>(null);
   const dragRef = useRef<{ startY: number; startVal: number; fine: boolean } | null>(null);
