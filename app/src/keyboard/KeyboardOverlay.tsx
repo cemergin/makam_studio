@@ -10,14 +10,17 @@ import { useEffect, useState } from 'react';
 
 const SCALE_KEYS = ['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyA','KeyS','KeyD','KeyF','KeyG','KeyQ','KeyW','KeyE','KeyR','KeyT'];
 const FLOWER_KEYS = ['KeyJ','KeyH','KeyN','KeyM','KeyK','KeyU','KeyI','KeyL'];
+const NUMBER_KEYS = ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8'];
 const SPECIAL_KEYS = ['Space','ShiftLeft','ShiftRight'];
-const ALL_KEYS = new Set([...SCALE_KEYS, ...FLOWER_KEYS, ...SPECIAL_KEYS]);
+const ALL_KEYS = new Set([...SCALE_KEYS, ...FLOWER_KEYS, ...NUMBER_KEYS, ...SPECIAL_KEYS]);
 
 const LABEL: Record<string, string> = {
   KeyZ: 'Z', KeyX: 'X', KeyC: 'C', KeyV: 'V', KeyB: 'B',
   KeyA: 'A', KeyS: 'S', KeyD: 'D', KeyF: 'F', KeyG: 'G',
   KeyQ: 'Q', KeyW: 'W', KeyE: 'E', KeyR: 'R', KeyT: 'T',
   KeyJ: 'J', KeyH: 'H', KeyN: 'N', KeyM: 'M', KeyK: 'K', KeyU: 'U', KeyI: 'I', KeyL: 'L',
+  Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4',
+  Digit5: '5', Digit6: '6', Digit7: '7', Digit8: '8',
   Space: '␣', ShiftLeft: '⇧', ShiftRight: '⇧',
 };
 
@@ -53,7 +56,7 @@ export function KeyboardOverlay() {
     };
   }, []);
 
-  const KeyCap = ({ code, role }: { code: string; role: 'scale' | 'flower' | 'special' }) => (
+  const KeyCap = ({ code, role }: { code: string; role: 'scale' | 'flower' | 'special' | 'number' }) => (
     <span
       className={[
         'kbo__key',
@@ -67,6 +70,12 @@ export function KeyboardOverlay() {
 
   return (
     <div className="kbo" aria-label="Keyboard layout + live input">
+      <div className="kbo__group" aria-label="Maqam selector">
+        <div className="kbo__row">
+          {NUMBER_KEYS.map((c) => <KeyCap key={c} code={c} role="number" />)}
+          <span className="kbo__row-label">maqam</span>
+        </div>
+      </div>
       <div className="kbo__group" aria-label="Scale rows">
         <div className="kbo__row">
           {['KeyQ','KeyW','KeyE','KeyR','KeyT'].map((c) => <KeyCap key={c} code={c} role="scale" />)}

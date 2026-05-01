@@ -57,6 +57,13 @@ export const KEY_TO_MANDAL_DELTA: Record<string, number> = {
   KeyI: 3,   // step up 3
 };
 
+/** Number row → maqam index in ALL_MAQAMAT. Switching loads the maqam
+ *  in canonical position (state resets via useQanunState's id-watch). */
+export const KEY_TO_MAQAM_INDEX: Record<string, number> = {
+  Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3,
+  Digit5: 4, Digit6: 5, Digit7: 6, Digit8: 7, Digit9: 8,
+};
+
 /** Same registers list `useQanunState` uses internally; mirroring here
  *  so the keyboard hook can resolve `(degree, octaveShift)` →
  *  string-index without reaching into qanun internals. */

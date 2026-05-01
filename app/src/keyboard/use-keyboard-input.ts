@@ -31,6 +31,7 @@ import type { MaqamPreset } from '../tuning/types';
 import type { QanunState } from '../qanun/use-qanun-state';
 import {
   KEY_TO_MANDAL_DELTA,
+  KEY_TO_MAQAM_INDEX,
   KEY_TO_SCALE,
   applyTranspose,
   resolveStringIndex,
@@ -57,6 +58,8 @@ interface UseKeyboardInputArgs {
   /** A ref shared with the parent so the hook can target the most-
    *  recently-plucked string from EITHER mouse or keyboard. */
   lastPluckedRef?: { current: number | null };
+  /** Called when a number key (1–9) selects a maqam by index. */
+  onSelectMaqam?: (index: number) => void;
 }
 
 interface HeldNote {
@@ -458,6 +461,23 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         e.preventDefault();
         heldKeysRef.current.add(e.code);
         startDrone();
+        return;
+      }
+
+      // Number-row maqam switch — release everything first so we don't
+      // have lingering notes ringing under the new tuning.
+      if (e.code in KEY_TO_MAQAM_INDEX) {
+        const idx = KEY_TO_MAQAM_INDEX[e.code];
+        const a = argsRef.current;
+        if (a.onSelectMaqam) {
+          releaseAllNotes();
+          releaseDrone();
+          // Pin state is per-string-index; clearing on maqam switch
+          // because string semantics change with the new preset.
+          pinnedMandalRef.current.clear();
+          if (a.onPinnedChange) a.onPinnedChange(new Set());
+          a.onSelectMaqam(idx);
+        }
         return;
       }
 

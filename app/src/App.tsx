@@ -164,6 +164,10 @@ export function App() {
           body={body}
           adsr={adsr}
           kararSemitoneOffset={kararSemitoneOffset}
+          onMaqamSelect={(idx) => {
+            const next = maqamat[idx];
+            if (next) setMaqam(next);
+          }}
         />
       </main>
       <KeyboardOverlay />

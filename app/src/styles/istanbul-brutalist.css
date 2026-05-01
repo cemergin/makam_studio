@@ -895,3 +895,6 @@ input[type='range'] {
   border-left: 2px solid var(--saffron);
   padding-left: 4px;
 }
+
+/* Number-row maqam selector (KeyboardOverlay) ---------------------- */
+.kbo__key--number { background: #2a3a3a; min-width: 22px; }

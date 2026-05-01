@@ -24,11 +24,13 @@ interface Props {
   /** ADSR envelope (full a/d/s/r). Sustained voices hold at S until release. */
   adsr: ADSR;
   kararSemitoneOffset?: number;
+  /** Number keys 1..9 select a maqam by its index in the rail. */
+  onMaqamSelect?: (index: number) => void;
 }
 
 export function QanunInstrument({
   maqam, audioContext, destination, voiceId, brightness, body,
-  adsr, kararSemitoneOffset = 0,
+  adsr, kararSemitoneOffset = 0, onMaqamSelect,
 }: Props) {
   const state = useQanunState(maqam);
   const kararHz = defaultKararHz(maqam) * Math.pow(2, kararSemitoneOffset / 12);
@@ -81,6 +83,7 @@ export function QanunInstrument({
     onSustainingChange: setSustainingIndices,
     onPinnedChange: setPinnedIndices,
     lastPluckedRef,
+    onSelectMaqam: onMaqamSelect,
   });
 
   const pluckString = (stringIndex: number) => {
