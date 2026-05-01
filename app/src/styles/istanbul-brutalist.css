@@ -842,6 +842,22 @@ input[type='range'] {
 
 .audio-resume:hover { filter: brightness(1.1); }
 
+.audio-resume--inline {
+  background: transparent;
+  color: var(--saffron, #f4a52a);
+  border: 1px solid var(--saffron, #f4a52a);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  cursor: pointer;
+  align-self: center;
+}
+.audio-resume--inline:hover {
+  background: rgba(244, 165, 42, 0.1);
+}
+
 /* ===================================================================
    Phase 2.2 additions — flash, karar bar, keyboard overlay
    =================================================================== */
