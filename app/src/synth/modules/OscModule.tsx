@@ -70,42 +70,48 @@ export function OscModule({
 
   return (
     <ConsoleModule title="OSC">
-      <label className="osc-module__select">
-        <span>machine</span>
-        <select
-          value={machineId}
-          onChange={(e) => onMachineId(e.target.value as MachineId)}
-        >
-          {MACHINES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-        </select>
-      </label>
-      <Knob label="octave"     value={octave}     min={-2} max={2} step={1} defaultValue={0}   onChange={onOctave}     modulated={modulatedPitch} />
-      <Knob label="brightness" value={brightness} min={0}  max={1}        defaultValue={0.6} onChange={onBrightness} />
-      <Knob label="body"       value={body}       min={0}  max={1}        defaultValue={0.3} onChange={onBody}       />
-      <label className="osc-module__select">
-        <span>voice</span>
-        <select
-          value={voiceMode}
-          onChange={(e) => onVoiceMode(e.target.value as 'poly' | 'legato')}
-        >
-          <option value="poly">poly</option>
-          <option value="legato">legato</option>
-        </select>
-      </label>
-      {voiceMode === 'legato' && (
-        <Knob
-          label="glide"
-          unit="ms"
-          value={glideMs}
-          min={5}
-          max={300}
-          log
-          defaultValue={60}
-          format={(v) => `${Math.round(v)}ms`}
-          onChange={onGlideMs}
-        />
+      <div className="console-module__row">
+        <label className="osc-module__select">
+          <span>machine</span>
+          <select
+            value={machineId}
+            onChange={(e) => onMachineId(e.target.value as MachineId)}
+          >
+            {MACHINES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </label>
+        <label className="osc-module__select">
+          <span>voice</span>
+          <select
+            value={voiceMode}
+            onChange={(e) => onVoiceMode(e.target.value as 'poly' | 'legato')}
+          >
+            <option value="poly">poly</option>
+            <option value="legato">legato</option>
+          </select>
+        </label>
+        <Knob label="octave"     value={octave}     min={-2} max={2} step={1} defaultValue={0}   onChange={onOctave}     modulated={modulatedPitch} />
+        <Knob label="brightness" value={brightness} min={0}  max={1}        defaultValue={0.6} onChange={onBrightness} />
+        <Knob label="body"       value={body}       min={0}  max={1}        defaultValue={0.3} onChange={onBody}       />
+        {voiceMode === 'legato' && (
+          <Knob
+            label="glide"
+            unit="ms"
+            value={glideMs}
+            min={5}
+            max={300}
+            log
+            defaultValue={60}
+            format={(v) => `${Math.round(v)}ms`}
+            onChange={onGlideMs}
+          />
+        )}
+      </div>
+      {MACHINE_PARAMS[machineId].length > 0 && (
+        <div className="console-module__row">
+          {MACHINE_PARAMS[machineId].map(renderMachineParam)}
+        </div>
       )}
-      {MACHINE_PARAMS[machineId].map(renderMachineParam)}
     </ConsoleModule>
   );
 }
