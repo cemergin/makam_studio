@@ -1085,7 +1085,7 @@ input[type='range'] {
   position: relative;
   flex: 1 1 0;
   min-width: 0;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-right: 1px solid rgba(247, 240, 220, 0.08);
   background: linear-gradient(180deg, rgba(247, 240, 220, 0.02), transparent);
 }
@@ -1103,7 +1103,7 @@ input[type='range'] {
 .console-module__body {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
+  gap: 4px 8px;
   align-items: flex-start;
 }
 .console-module__arrow {
@@ -1199,8 +1199,8 @@ input[type='range'] {
 .console__rack {
   display: flex;
   align-items: stretch;
-  min-height: 196px;
-  padding: 8px 0;
+  min-height: 132px;
+  padding: 6px 0;
 }
 
 /* OscModule */
