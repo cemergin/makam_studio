@@ -1060,10 +1060,11 @@ input[type='range'] {
 }
 .knob__indicator {
   position: absolute;
-  top: 50%; left: 50%;
-  width: 2px; height: 50%;
+  top: 4px; left: calc(50% - 1px);
+  width: 2px; height: calc(50% - 4px);
   background: var(--saffron, #f4a52a);
-  transform-origin: top center;
+  transform-origin: bottom center;
+  border-radius: 1px;
 }
 .knob__face--modulated .knob__indicator {
   animation: knob-pulse 1.4s ease-in-out infinite;
