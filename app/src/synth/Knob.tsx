@@ -110,7 +110,20 @@ export function Knob({
     if (e.key === 'ArrowDown' || e.key === 'ArrowLeft')  { e.preventDefault(); onChange(Math.max(min, value - s)); }
   };
 
-  const display = format ? format(value) : value.toFixed(unit === 'Hz' || unit === '¢' ? 0 : 2) + unit;
+  const formatDefault = (v: number): string => {
+    // Integer-step knobs (octave, etc.) → show as int with +/- sign
+    if (step != null && step >= 1) {
+      const sign = v > 0 ? '+' : '';
+      return `${sign}${Math.round(v)}${unit}`;
+    }
+    // Hz / cents → 0 decimals
+    if (unit === 'Hz' || unit === '¢') {
+      return `${Math.round(v)}${unit}`;
+    }
+    // Otherwise 2 decimals
+    return `${v.toFixed(2)}${unit}`;
+  };
+  const display = format ? format(value) : formatDefault(value);
 
   return (
     <div className="knob" style={{ width: size }}>

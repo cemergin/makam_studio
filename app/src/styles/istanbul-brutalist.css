@@ -1261,6 +1261,12 @@ input[type='range'] {
   border: 1px solid rgba(247, 240, 220, 0.2);
   padding: 4px 6px;
 }
+.osc-module__vstack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
 
 /* AmpModule */
 .amp-module__curve {
