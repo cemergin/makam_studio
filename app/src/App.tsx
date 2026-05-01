@@ -201,10 +201,8 @@ export function App() {
         />
         <FxModule bus={bus} />
         <MasterModule
-          masterVolume={masterVolume}
           level={level}
           audioState={audioState}
-          onMasterVolume={setMasterVolume}
           onResume={() => resume()}
         />
       </Console>
