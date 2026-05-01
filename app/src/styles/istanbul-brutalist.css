@@ -1095,3 +1095,38 @@ input[type='range'] {
   opacity: 0.5;
   pointer-events: none;
 }
+
+/* Meter */
+.meter {
+  position: relative;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(247, 240, 220, 0.15);
+  overflow: hidden;
+}
+.meter--large { width: 140px; height: 12px; }
+.meter--tiny  { width: 60px;  height: 6px; }
+.meter__fill {
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  background: var(--saffron, #f4a52a);
+  transition: width 30ms linear;
+}
+.meter__fill--hot {
+  background: linear-gradient(90deg, var(--saffron, #f4a52a) 60%, #d23c1f 100%);
+}
+.meter__peak {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: rgba(247, 240, 220, 0.95);
+  transform: translateX(-1px);
+}
+.meter__clip-lamp {
+  position: absolute;
+  top: 50%; right: 4px;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: #d23c1f;
+  box-shadow: 0 0 4px rgba(210, 60, 31, 0.8);
+}
