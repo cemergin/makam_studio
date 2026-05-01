@@ -3126,6 +3126,110 @@ git commit -m "Legato voice mode: mono voice + key stack, no envelope retrigger"
 
 ---
 
+## Phase 8 — Drone uses active machine
+
+### Task 8.1: Replace dedicated drone trigger with active-machine + hold-at-peak ADSR
+
+**Why:** Today the drone (Space key) plays a dedicated `sustained-drone.ts` voice — a sine-pad regardless of which machine is selected. The user wants the drone to use the **active machine** so it shares the timbre, FX chain, and modulation of whatever's currently selected. "Sustain at the top" means the drone holds at the envelope's peak indefinitely, so it doesn't decay to a sustain level lower than peak.
+
+**Files:**
+- Modify: `app/src/keyboard/use-keyboard-input.ts`
+
+- [ ] **Step 1: Locate the drone trigger**
+
+In `app/src/keyboard/use-keyboard-input.ts`, find `startDrone()` and `releaseDrone()`. The current implementation calls `triggerSustainedDrone({...})` from `audio/machines/sustained-drone.ts` and stores a `DroneHandle` ref.
+
+- [ ] **Step 2: Replace with `triggerMachineSustained` using a hold-at-peak ADSR**
+
+Change the trigger to use the active machine plus an ADSR with `s: 1` (sustain at peak, so the held level equals the attack peak — "sustain at the top"). The drone's pitch + octaveOffset still come from the held key + droneOctave args:
+
+```ts
+const startDrone = () => {
+  if (droneRef.current) return;
+  const a = argsRef.current;
+  const baseHz = lastPluckedHzRef.current ?? a.kararHz;
+  const droneHz = baseHz * Math.pow(2, (a.droneOctave ?? 0));
+
+  // Drone ADSR: short attack, hold at peak indefinitely (s = 1),
+  // medium release. Filter env amount = 0 so the filter sweep
+  // doesn't decay into nothing while held.
+  const droneAdsr: ADSR = { a: 0.05, d: 0.05, s: 1.0, r: 0.6 };
+  const droneFilterEnv: FilterEnv = { ...a.filterEnv, amount: 0 };
+
+  const handle = triggerMachineSustained(a.machineId, {
+    audioContext: a.audioContext,
+    destination: a.destination,
+    frequencyHz: droneHz,
+    velocity: 0.6,
+    brightness: a.brightness,
+    body: a.body,
+    adsr: droneAdsr,
+    filter: a.filter,
+    filterEnv: droneFilterEnv,
+    lfo1: a.lfo1,
+    lfo2: a.lfo2,
+    octaveOffset: 0, // drone applies its own octave above; don't double
+    params: a.machineParams,
+  });
+  droneRef.current = handle;
+};
+
+const releaseDrone = () => {
+  droneRef.current?.release();
+  droneRef.current = null;
+};
+```
+
+(Adjust the ref typing — `droneRef` becomes `useRef<MachineHandle | null>(null)`.)
+
+- [ ] **Step 3: Add `machineParams` to `UseKeyboardInputArgs`**
+
+If `machineParams: MachineParamValues` isn't already threaded through (Task 4.1 / 7.1 may add it), add it as an optional field on the args interface and consume it in the drone trigger above.
+
+- [ ] **Step 4: Remove the dedicated drone import**
+
+Remove `import { triggerSustainedDrone, type DroneHandle } from '../audio/machines/sustained-drone';` (or whichever import path was used).
+
+- [ ] **Step 5: (Optional) Delete `sustained-drone.ts` if no other callers**
+
+```bash
+grep -rn "sustained-drone\|triggerSustainedDrone\|DroneHandle" /Users/cemergin/lab/makam_studio/app/src/
+```
+
+If no other callers remain:
+
+```bash
+git rm app/src/audio/machines/sustained-drone.ts
+```
+
+If other callers exist, leave the file in place — removing it isn't required for this task.
+
+- [ ] **Step 6: Build + smoke test**
+
+Run: `cd app && bun run build && bun run dev`
+
+In browser:
+1. Pick the qanun machine. Hold a scale key, press Space — drone plays. Release Space → drone releases through ADSR R.
+2. Switch to vapor-pluck. Hold key + Space — drone now sounds like vapor-pluck.
+3. Switch to dream-pad — drone is the pad timbre.
+4. With drone playing, twist the OSC brightness knob — drone reflects it (since it shares the active machine's settings).
+5. Drone octave control still works (-2..+2 shifts the held pitch).
+6. The drone goes through the master FX chain (set reverb wet > 0 — drone has reverb).
+7. Switching machine while drone is playing — current drone keeps playing under the old machine until released; next Space press uses the new machine. (Acceptable: switching mid-drone doesn't migrate the voice.)
+
+Stop dev server.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add app/src/keyboard/use-keyboard-input.ts
+# if sustained-drone.ts deleted:
+# git add app/src/audio/machines/sustained-drone.ts
+git commit -m "Drone uses active machine with hold-at-peak ADSR (S=1)"
+```
+
+---
+
 ## Risks + mitigations
 
 - **Phase 1 master-bus rewire is the highest-risk change.** The limiter at the tail is the safety net; smoke testing with the current UI before any layout disruption catches problems early. The test in Task 1.4 explicitly verifies "reverb + delay both fully wet doesn't run away."

@@ -484,6 +484,28 @@ Each phase ends in a commit. The app is shippable between phases.
   Mitigation: keep `MachineConfig` map in `App.tsx` exactly as today,
   pass into modules instead of `SynthControls`.
 
+## Drone uses active machine
+
+The Space-key drone today plays a dedicated `sustained-drone.ts` voice
+— a fixed sine-pad regardless of which machine is selected. After the
+console refactor, the drone uses the **active machine** so it shares
+the timbre, FX chain, and modulation of whatever's currently
+selected.
+
+- Drone trigger calls `triggerMachineSustained(activeMachineId, ...)`
+  with a hold-at-peak ADSR (`{ a: 0.05, d: 0.05, s: 1.0, r: 0.6 }`)
+  so the held level equals the attack peak — "sustain at the top".
+- Filter env amount is forced to 0 for the drone to prevent the
+  cutoff sweep decaying into silence under the indefinite hold.
+- Drone octave control (Space + ± shortcuts) still works — applied
+  before the trigger as a frequency multiplier.
+- Master FX chain applies (reverb / delay / overdrive shape the
+  drone the same way they shape plucked notes).
+- Switching machines mid-drone doesn't migrate the voice; the next
+  Space press uses the new machine.
+- The dedicated `sustained-drone.ts` module can be removed if no
+  other callers reference it.
+
 ## Out of scope
 
 - Routing modes for sends (the previous `parallel | series` toggle is
