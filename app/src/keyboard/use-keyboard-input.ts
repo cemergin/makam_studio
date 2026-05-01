@@ -53,8 +53,10 @@ interface UseKeyboardInputArgs {
 interface HeldNote {
   handle: VoiceHandle;
   stringIndex: number;
-  baseHz: number;     // the canonical pitch at keydown time
-  currentHz: number;  // current sounding pitch (after any modifier slide)
+  baseHz: number;             // pitch at keydown time
+  currentHz: number;          // current sounding pitch (after any modifier slide)
+  baseMandalIdx: number;      // mandal index at keydown time
+  currentMandalIdx: number;   // current mandal index (drives state visualization)
 }
 
 export function useKeyboardInput(args: UseKeyboardInputArgs): void {
@@ -99,36 +101,42 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       return s ? s.soundingCents : 0;
     };
 
-    /** Apply a mandal-step delta from a string's CURRENT position,
-     *  returning the resulting sounding cents (no state mutation). */
-    const soundingAfterDelta = (stringIndex: number, delta: number): number => {
-      const a = argsRef.current;
-      const s = a.state.strings[stringIndex];
-      if (!s) return 0;
-      const row = a.maqam.rows.find((r) => r.degree === s.rowDegree);
-      if (!row) return s.soundingCents;
-      const legal = row.legal_positions;
-      if (legal.length === 0) return s.soundingCents;
-      const { index: cur } = nearestMandalPosition(s.currentCentsMid, legal);
-      const dir = (delta > 0 ? 1 : -1) as 1 | -1;
-      let target = cur;
-      for (let i = 0; i < Math.abs(delta); i++) {
-        target = stepMandalIndex(target, dir, legal);
-      }
-      return soundingCentsAt(stringIndex, target);
-    };
 
     const startScaleNote = (code: string, stringIndex: number) => {
       const a = argsRef.current;
-      // If somehow already held, release the old one first.
       const existing = heldNotesRef.current.get(code);
       if (existing) existing.handle.release();
 
+      const s = a.state.strings[stringIndex];
+      const row = s ? a.maqam.rows.find((r) => r.degree === s.rowDegree) : null;
+      const legal = row?.legal_positions ?? [];
+      const baseMandalIdx = legal.length > 0 && s
+        ? nearestMandalPosition(s.currentCentsMid, legal).index
+        : 0;
+
       const baseCents = baseSoundingCents(stringIndex);
+
       // Apply pending modifier (if any) BEFORE the keydown sounds.
+      // This ALSO updates the qanun state so the visualization moves.
+      let initialMandalIdx = baseMandalIdx;
       let initialCents = baseCents;
-      if (pendingDeltaRef.current !== 0) {
-        initialCents = soundingAfterDelta(stringIndex, pendingDeltaRef.current);
+      if (pendingDeltaRef.current !== 0 && legal.length > 0) {
+        const delta = pendingDeltaRef.current;
+        const dir = (delta > 0 ? 1 : -1) as 1 | -1;
+        let target = baseMandalIdx;
+        for (let i = 0; i < Math.abs(delta); i++) {
+          target = stepMandalIndex(target, dir, legal);
+        }
+        // Drive state to the modified position so labels update.
+        const diff = target - baseMandalIdx;
+        if (diff !== 0) {
+          const stepDir = (diff > 0 ? 1 : -1) as 1 | -1;
+          for (let i = 0; i < Math.abs(diff); i++) {
+            a.state.stepMandal(stringIndex, stepDir);
+          }
+        }
+        initialMandalIdx = target;
+        initialCents = soundingCentsAt(stringIndex, target);
         pendingDeltaRef.current = 0;
       }
       const hz = centsToHz(a.kararHz, initialCents);
@@ -149,6 +157,8 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         stringIndex,
         baseHz,
         currentHz: hz,
+        baseMandalIdx,
+        currentMandalIdx: initialMandalIdx,
       });
       activeStringRef.current = stringIndex;
       a.onPluck?.(stringIndex);
@@ -173,23 +183,57 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       return true;
     };
 
-    /** Apply a delta to all currently-held notes' live pitches. */
+    /** Apply a delta (relative to BASE mandal index, not current) to all
+     *  currently-held notes. Updates both the audio (setFrequency) AND
+     *  the qanun state (state.stepMandal) so the perde labels and the
+     *  position bar slide alongside the pitch. */
     const slideHeldNotesBy = (delta: number, glideMs = 30) => {
       const a = argsRef.current;
       heldNotesRef.current.forEach((note) => {
-        const targetCents =
-          delta === 0
-            ? baseSoundingCents(note.stringIndex)
-            : soundingAfterDelta(note.stringIndex, delta);
+        const s = a.state.strings[note.stringIndex];
+        if (!s) return;
+        const row = a.maqam.rows.find((r) => r.degree === s.rowDegree);
+        if (!row) return;
+        const legal = row.legal_positions;
+        if (legal.length === 0) return;
+
+        // Target index = base + delta (clamped via stepMandalIndex).
+        const dir = (delta > 0 ? 1 : -1) as 1 | -1;
+        let targetIdx = note.baseMandalIdx;
+        for (let i = 0; i < Math.abs(delta); i++) {
+          targetIdx = stepMandalIndex(targetIdx, dir, legal);
+        }
+
+        // Step state from currentMandalIdx → targetIdx.
+        const diff = targetIdx - note.currentMandalIdx;
+        if (diff !== 0) {
+          const stepDir = (diff > 0 ? 1 : -1) as 1 | -1;
+          for (let i = 0; i < Math.abs(diff); i++) {
+            a.state.stepMandal(note.stringIndex, stepDir);
+          }
+        }
+        note.currentMandalIdx = targetIdx;
+
+        // Slide the audio.
+        const targetCents = soundingCentsAt(note.stringIndex, targetIdx);
         const targetHz = centsToHz(a.kararHz, targetCents);
         note.currentHz = targetHz;
         note.handle.setFrequency(targetHz, glideMs);
       });
     };
 
-    /** Slide every held note BACK to its base pitch. */
+    /** Slide every held note BACK to its base mandal index + pitch. */
     const slideHeldNotesToBase = (glideMs = 30) => {
+      const a = argsRef.current;
       heldNotesRef.current.forEach((note) => {
+        const stepsBack = note.baseMandalIdx - note.currentMandalIdx;
+        if (stepsBack !== 0) {
+          const dir = (stepsBack > 0 ? 1 : -1) as 1 | -1;
+          for (let i = 0; i < Math.abs(stepsBack); i++) {
+            a.state.stepMandal(note.stringIndex, dir);
+          }
+        }
+        note.currentMandalIdx = note.baseMandalIdx;
         note.currentHz = note.baseHz;
         note.handle.setFrequency(note.baseHz, glideMs);
       });
