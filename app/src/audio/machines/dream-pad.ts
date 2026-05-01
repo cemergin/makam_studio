@@ -20,6 +20,7 @@ import {
   type FilterEnv,
   type LfoConfig,
 } from './_machine-config';
+import type { MachineParamValues } from './index';
 
 export interface DreamPadTrigger {
   audioContext: AudioContext;
@@ -35,6 +36,24 @@ export interface DreamPadTrigger {
   filterEnv?: FilterEnv;
   lfo1?: LfoConfig;
   lfo2?: LfoConfig;
+  octaveOffset?: number;
+  params?: MachineParamValues;
+}
+
+/** Resolve pad detune/chorus from params with defaults from MACHINE_PARAMS. */
+function resolvePadParams(params?: MachineParamValues): {
+  detuneCents: number;
+  chorusAmt: number;
+} {
+  const detRaw = params?.detune;
+  const detuneCents = typeof detRaw === 'number' && Number.isFinite(detRaw)
+    ? Math.max(0, Math.min(40, detRaw))
+    : 12;
+  const chRaw = params?.chorus;
+  const chorusAmt = typeof chRaw === 'number' && Number.isFinite(chRaw)
+    ? Math.max(0, Math.min(1, chRaw))
+    : 0.4;
+  return { detuneCents, chorusAmt };
 }
 
 export function triggerDreamPad(t: DreamPadTrigger): void {
@@ -50,15 +69,20 @@ export function triggerDreamPad(t: DreamPadTrigger): void {
   const decayLen = 4.0 + decay * 4.0;
   const stopAt = when + attack + decayLen + 0.3;
 
+  // params.detune (cents total spread) replaces hardcoded ±5¢.
+  // params.chorus scales the breathing tremolo depth below.
+  const { detuneCents, chorusAmt } = resolvePadParams(t.params);
+  const halfDetune = detuneCents / 2;
+
   const oscSine = ctx.createOscillator();
   oscSine.type = 'sine';
   oscSine.frequency.value = f;
-  oscSine.detune.value = -5;
+  oscSine.detune.value = -halfDetune;
 
   const oscTri = ctx.createOscillator();
   oscTri.type = 'triangle';
   oscTri.frequency.value = f;
-  oscTri.detune.value = 5;
+  oscTri.detune.value = halfDetune;
 
   const sumGain = ctx.createGain();
   sumGain.gain.value = 0.5;
@@ -103,7 +127,8 @@ export function triggerDreamPad(t: DreamPadTrigger): void {
   lfo.type = 'sine';
   lfo.frequency.value = 0.3;
   const lfoDepth = ctx.createGain();
-  lfoDepth.gain.value = peak * 0.15;
+  // params.chorus multiplies the existing tremolo/chorus depth.
+  lfoDepth.gain.value = peak * 0.15 * chorusAmt;
   lfo.connect(lfoDepth);
   lfoDepth.connect(outGain.gain);
   lfo.start(when);
@@ -145,15 +170,22 @@ export function triggerDreamPadSustained(t: DreamPadTrigger): MachineHandle {
     a: 0.5, d: 1.0, s: 0.5, r: 1.0, amount: 0.0,
   };
 
+  // params.detune (cents total spread) replaces hardcoded ±5¢.
+  // TODO: params.chorus currently unused in sustained variant — see plan task 1.2
+  // (no chorus/tremolo stage in the sustained voice graph; the slow attack
+  // already provides motion).
+  const { detuneCents } = resolvePadParams(t.params);
+  const halfDetune = detuneCents / 2;
+
   const oscSine = ctx.createOscillator();
   oscSine.type = 'sine';
   oscSine.frequency.value = f;
-  oscSine.detune.value = -5;
+  oscSine.detune.value = -halfDetune;
 
   const oscTri = ctx.createOscillator();
   oscTri.type = 'triangle';
   oscTri.frequency.value = f;
-  oscTri.detune.value = 5;
+  oscTri.detune.value = halfDetune;
 
   const sumGain = ctx.createGain();
   sumGain.gain.value = 0.5;

@@ -24,6 +24,7 @@ import {
   type FilterEnv,
   type LfoConfig,
 } from './_machine-config';
+import type { MachineParamValues } from './index';
 
 export interface VaporPluckTrigger {
   audioContext: AudioContext;
@@ -39,6 +40,30 @@ export interface VaporPluckTrigger {
   filterEnv?: FilterEnv;
   lfo1?: LfoConfig;
   lfo2?: LfoConfig;
+  octaveOffset?: number;
+  params?: MachineParamValues;
+}
+
+/** Helper: read a finite number from params, clamped to [min, max]. */
+function readNum(
+  params: MachineParamValues | undefined,
+  name: string,
+  min: number,
+  max: number,
+): number | null {
+  const raw = params?.[name];
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
+  return Math.max(min, Math.min(max, raw));
+}
+
+/** Build a short white-noise buffer (50ms) for attack-burst flavor. */
+function makeNoiseBuffer(ctx: AudioContext, durationSec: number): AudioBuffer {
+  const sampleRate = ctx.sampleRate;
+  const length = Math.max(1, Math.floor(sampleRate * durationSec));
+  const buf = ctx.createBuffer(1, length, sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+  return buf;
 }
 
 export function triggerVaporPluck(t: VaporPluckTrigger): void {
@@ -76,14 +101,35 @@ export function triggerVaporPluck(t: VaporPluckTrigger): void {
   env.gain.exponentialRampToValueAtTime(0.0001, when + envDecay);
   sumGain.connect(env);
 
+  // params.damping (0..1) multiplies Q by (0.5 + damping * 1.5).
+  const damping = readNum(t.params, 'damping', 0, 1);
   const bp = ctx.createBiquadFilter();
   bp.type = 'bandpass';
-  bp.Q.value = 3;
+  bp.Q.value = 3 * (damping !== null ? (0.5 + damping * 1.5) : 1);
   const sweepTop = 3500 + brightness * 1500;
   const sweepBottom = 800;
   bp.frequency.setValueAtTime(sweepTop, when);
   bp.frequency.exponentialRampToValueAtTime(sweepBottom, when + sweepDuration);
   env.connect(bp);
+
+  // params.noise (0..1) — short attack noise burst into sumGain.
+  const noiseAmt = readNum(t.params, 'noise', 0, 1);
+  let noiseSrc: AudioBufferSourceNode | null = null;
+  let noiseGain: GainNode | null = null;
+  if (noiseAmt !== null && noiseAmt > 0) {
+    const burstLen = 0.05;
+    noiseSrc = ctx.createBufferSource();
+    noiseSrc.buffer = makeNoiseBuffer(ctx, burstLen);
+    noiseGain = ctx.createGain();
+    const peak = noiseAmt * 0.2;
+    noiseGain.gain.setValueAtTime(0.0001, when);
+    noiseGain.gain.linearRampToValueAtTime(peak, when + 0.002);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, when + burstLen);
+    noiseSrc.connect(noiseGain);
+    noiseGain.connect(sumGain);
+    noiseSrc.start(when);
+    noiseSrc.stop(when + burstLen + 0.01);
+  }
 
   const chorusSum = ctx.createGain();
   chorusSum.gain.value = 0.5;
@@ -136,6 +182,8 @@ export function triggerVaporPluck(t: VaporPluckTrigger): void {
     try { lfoGain1.disconnect(); } catch { /* idempotent */ }
     try { lfoGain2.disconnect(); } catch { /* idempotent */ }
     try { outGain.disconnect(); } catch { /* idempotent */ }
+    if (noiseSrc) { try { noiseSrc.disconnect(); } catch { /* idempotent */ } }
+    if (noiseGain) { try { noiseGain.disconnect(); } catch { /* idempotent */ } }
   }, Math.max(100, stopAtMs + 50));
 }
 
@@ -178,12 +226,35 @@ export function triggerVaporPluckSustained(t: VaporPluckTrigger): MachineHandle 
     detunes.push(osc.detune);
   }
 
+  // params.damping (0..1) multiplies Q by (0.5 + damping * 1.5).
+  const damping = readNum(t.params, 'damping', 0, 1);
+  const qMul = damping !== null ? (0.5 + damping * 1.5) : 1;
+
   // Configurable filter (was a static bandpass before).
   const filter = ctx.createBiquadFilter();
   filter.type = filterCfg.type === 'hp' ? 'highpass' : filterCfg.type === 'bp' ? 'bandpass' : 'lowpass';
   filter.frequency.value = filterCfg.cutoff;
-  filter.Q.value = filterCfg.q;
+  filter.Q.value = filterCfg.q * qMul;
   sumGain.connect(filter);
+
+  // params.noise (0..1) — short attack noise burst into sumGain.
+  const noiseAmt = readNum(t.params, 'noise', 0, 1);
+  let noiseSrc: AudioBufferSourceNode | null = null;
+  let noiseGain: GainNode | null = null;
+  if (noiseAmt !== null && noiseAmt > 0) {
+    const burstLen = 0.05;
+    noiseSrc = ctx.createBufferSource();
+    noiseSrc.buffer = makeNoiseBuffer(ctx, burstLen);
+    noiseGain = ctx.createGain();
+    const noisePeak = noiseAmt * 0.2;
+    noiseGain.gain.setValueAtTime(0.0001, when);
+    noiseGain.gain.linearRampToValueAtTime(noisePeak, when + 0.002);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, when + burstLen);
+    noiseSrc.connect(noiseGain);
+    noiseGain.connect(sumGain);
+    noiseSrc.start(when);
+    noiseSrc.stop(when + burstLen + 0.01);
+  }
 
   // ADSR env
   const env = ctx.createGain();
@@ -211,6 +282,8 @@ export function triggerVaporPluckSustained(t: VaporPluckTrigger): MachineHandle 
     try { sumGain.disconnect(); } catch { /* */ }
     try { env.disconnect(); } catch { /* */ }
     try { filter.disconnect(); } catch { /* */ }
+    if (noiseSrc) { try { noiseSrc.disconnect(); } catch { /* */ } }
+    if (noiseGain) { try { noiseGain.disconnect(); } catch { /* */ } }
     lfos.cleanup();
   };
 

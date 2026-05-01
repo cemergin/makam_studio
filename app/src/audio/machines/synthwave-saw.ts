@@ -23,6 +23,7 @@ import {
   type FilterEnv,
   type LfoConfig,
 } from './_machine-config';
+import type { MachineParamValues } from './index';
 
 export interface SynthwaveSawTrigger {
   audioContext: AudioContext;
@@ -38,6 +39,39 @@ export interface SynthwaveSawTrigger {
   filterEnv?: FilterEnv;
   lfo1?: LfoConfig;
   lfo2?: LfoConfig;
+  octaveOffset?: number;
+  params?: MachineParamValues;
+}
+
+/** Resolve unison/detune from params with defaults matching MACHINE_PARAMS. */
+function resolveSynthParams(params?: MachineParamValues): {
+  unisonCount: number;
+  detuneCents: number;
+} {
+  const unisonRaw = params?.unison;
+  const unisonStr = typeof unisonRaw === 'string' ? unisonRaw : String(unisonRaw ?? '');
+  const unisonNum = Number(unisonStr);
+  const unisonCount = Number.isFinite(unisonNum) && [1, 3, 5, 7].includes(unisonNum)
+    ? unisonNum
+    : 3;
+  const detRaw = params?.detune;
+  const detuneCents = typeof detRaw === 'number' && Number.isFinite(detRaw)
+    ? Math.max(0, Math.min(30, detRaw))
+    : 8;
+  return { unisonCount, detuneCents };
+}
+
+/** Build N detune offsets in cents, symmetrically distributed around 0,
+ *  spanning ±detuneCents/2 (so detuneCents is the total range). */
+function buildDetunes(count: number, detuneCents: number): number[] {
+  if (count <= 1) return [0];
+  const out: number[] = [];
+  const half = detuneCents / 2;
+  for (let i = 0; i < count; i++) {
+    const t = count === 1 ? 0 : (i / (count - 1)) * 2 - 1; // -1..1
+    out.push(t * half);
+  }
+  return out;
 }
 
 export function triggerSynthwaveSaw(t: SynthwaveSawTrigger): void {
@@ -52,10 +86,13 @@ export function triggerSynthwaveSaw(t: SynthwaveSawTrigger): void {
   const envDecay = 0.6 + decay * 1.4;
   const stopAt = when + envDecay + 0.2;
 
-  const detunes = [-3, 0, 3];
+  // params.unison (1|3|5|7) controls saw count; params.detune sets cents range.
+  // TODO: params.sub currently unused — see plan task 1.2 (no sub-osc in voice graph).
+  const { unisonCount, detuneCents } = resolveSynthParams(t.params);
+  const detunes = buildDetunes(unisonCount, detuneCents);
   const oscs: OscillatorNode[] = [];
   const sumGain = ctx.createGain();
-  sumGain.gain.value = 1 / 3;
+  sumGain.gain.value = 1 / Math.max(1, detunes.length);
 
   for (const cents of detunes) {
     const osc = ctx.createOscillator();
@@ -128,11 +165,14 @@ export function triggerSynthwaveSawSustained(t: SynthwaveSawTrigger): MachineHan
     a: 0.005, d: 0.5, s: 0.2, r: 0.3, amount: 0.4,
   };
 
-  const detunesCents = [-3, 0, 3];
+  // params.unison (1|3|5|7) controls saw count; params.detune sets cents range.
+  // TODO: params.sub currently unused — see plan task 1.2 (no sub-osc in voice graph).
+  const { unisonCount, detuneCents } = resolveSynthParams(t.params);
+  const detunesCents = buildDetunes(unisonCount, detuneCents);
   const oscs: OscillatorNode[] = [];
   const detunesParams: AudioParam[] = [];
   const sumGain = ctx.createGain();
-  sumGain.gain.value = 1 / 3;
+  sumGain.gain.value = 1 / Math.max(1, detunesCents.length);
   for (const cents of detunesCents) {
     const osc = ctx.createOscillator();
     osc.type = 'sawtooth';

@@ -34,6 +34,7 @@ import {
   attachLfos,
   scheduleFilterEnv,
 } from './machines/_machine-config';
+import type { MachineParamValues } from './machines';
 
 export interface ADSR {
   a: number;  // attack seconds
@@ -65,6 +66,11 @@ export interface QanunMachineTrigger {
   /** Up to 2 LFOs (sustained variant only). */
   lfo1?: LfoConfig;
   lfo2?: LfoConfig;
+  /** Octave offset — applied at dispatch, not here. Accepted for API
+   *  symmetry so callers can pass it without TypeScript errors. */
+  octaveOffset?: number;
+  /** Machine-specific params (pluck, sympathy). See MACHINE_PARAMS. */
+  params?: MachineParamValues;
 }
 
 export interface MachineHandle {
@@ -106,12 +112,26 @@ function buildOneShot(t: QanunMachineTrigger): {
   // Resolve ADSR. If full adsr provided, use it. Otherwise build from
   // the legacy `decay` knob (treated as a fast attack + the user's
   // decay-to-zero time, no sustain hold for one-shot mouse plucks).
-  const adsr: ADSR = t.adsr ?? {
+  const baseAdsr: ADSR = t.adsr ?? {
     a: 0.005,
     d: 0.5 + Math.max(0, Math.min(1, t.decay ?? 0.7)) * 1.5, // 0.5–2s
     s: 0.0, // legacy plucks decay to zero
     r: 0.3,
   };
+  // params.pluck (0..1) scales attack: pluck=0 → 100% attack, pluck=1 → 10%.
+  const pluckRaw = t.params?.pluck;
+  const pluck = typeof pluckRaw === 'number' && Number.isFinite(pluckRaw)
+    ? Math.max(0, Math.min(1, pluckRaw))
+    : null;
+  const adsr: ADSR = pluck !== null
+    ? { ...baseAdsr, a: baseAdsr.a * (1 - pluck * 0.9) }
+    : baseAdsr;
+  // params.sympathy (0..1) multiplies body gain by (1 + sympathy * 0.5).
+  const sympathyRaw = t.params?.sympathy;
+  const sympathy = typeof sympathyRaw === 'number' && Number.isFinite(sympathyRaw)
+    ? Math.max(0, Math.min(1, sympathyRaw))
+    : null;
+  const bodyMul = sympathy !== null ? (1 + sympathy * 0.5) : 1;
 
   // Voice nodes
   const osc = ctx.createOscillator();
@@ -128,7 +148,7 @@ function buildOneShot(t: QanunMachineTrigger): {
   lp.Q.value = 0.7;
 
   const bodyMixGain = ctx.createGain();
-  bodyMixGain.gain.value = body * 0.15;
+  bodyMixGain.gain.value = body * 0.15 * bodyMul;
 
   const env = ctx.createGain();
 
@@ -204,7 +224,21 @@ export function triggerQanunSustained(t: QanunMachineTrigger): MachineHandle {
   const brightness = Math.max(0, Math.min(1, t.brightness ?? 0.6));
   const body = Math.max(0, Math.min(1, t.body ?? 0.3));
   const f = Math.max(20, t.frequencyHz);
-  const adsr: ADSR = t.adsr ?? { a: 0.005, d: 0.4, s: 0.5, r: 0.5 };
+  const baseAdsr: ADSR = t.adsr ?? { a: 0.005, d: 0.4, s: 0.5, r: 0.5 };
+  // params.pluck (0..1) scales attack: pluck=0 → 100% attack, pluck=1 → 10%.
+  const pluckRaw = t.params?.pluck;
+  const pluck = typeof pluckRaw === 'number' && Number.isFinite(pluckRaw)
+    ? Math.max(0, Math.min(1, pluckRaw))
+    : null;
+  const adsr: ADSR = pluck !== null
+    ? { ...baseAdsr, a: baseAdsr.a * (1 - pluck * 0.9) }
+    : baseAdsr;
+  // params.sympathy (0..1) multiplies body gain by (1 + sympathy * 0.5).
+  const sympathyRaw = t.params?.sympathy;
+  const sympathy = typeof sympathyRaw === 'number' && Number.isFinite(sympathyRaw)
+    ? Math.max(0, Math.min(1, sympathyRaw))
+    : null;
+  const bodyMul = sympathy !== null ? (1 + sympathy * 0.5) : 1;
   const peak = v * 0.35;
 
   // Defaults: lp, cutoff 6000, q 0.7. Brightness biases the cutoff up.
@@ -226,7 +260,7 @@ export function triggerQanunSustained(t: QanunMachineTrigger): MachineHandle {
   oscBody.frequency.value = f * 1.5;
 
   const bodyMixGain = ctx.createGain();
-  bodyMixGain.gain.value = body * 0.15;
+  bodyMixGain.gain.value = body * 0.15 * bodyMul;
 
   // Sum of main + body BEFORE the filter.
   const sumGain = ctx.createGain();
