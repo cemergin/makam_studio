@@ -1099,11 +1099,13 @@ input[type='range'] {
 /* Console module shell */
 .console-module {
   position: relative;
-  flex: 0 0 auto;            /* size to content, don't stretch */
+  flex: 0 0 auto;
   min-width: 0;
-  padding: 6px 10px;
-  border-right: 1px solid rgba(247, 240, 220, 0.08);
-  background: linear-gradient(180deg, rgba(247, 240, 220, 0.02), transparent);
+  padding: 8px 14px 8px 14px;
+  border-right: 1px solid rgba(247, 240, 220, 0.1);
+  background: linear-gradient(180deg, rgba(247, 240, 220, 0.025), transparent);
+  display: flex;
+  flex-direction: column;
 }
 .console-module:last-child { border-right: none; }
 .console-module__header {
@@ -1122,13 +1124,14 @@ input[type='range'] {
 .console-module__body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   align-items: flex-start;
+  flex: 1;
 }
 .console-module__row {
   display: flex;
   flex-wrap: nowrap;
-  gap: 6px 8px;
+  gap: 8px 10px;
   align-items: flex-end;
 }
 .console-module__sub-label {
