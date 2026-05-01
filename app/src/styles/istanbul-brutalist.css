@@ -1107,14 +1107,17 @@ input[type='range'] {
 }
 .console-module:last-child { border-right: none; }
 .console-module__header {
-  margin-bottom: 6px;
+  margin: 0 0 8px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(244, 165, 42, 0.18);
 }
 .console-module__title {
-  font-family: var(--font-sans);
+  font-family: var(--font-sans, 'Inter', sans-serif);
   font-size: 10px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(247, 240, 220, 0.7);
+  color: var(--saffron, #f4a52a);
+  font-weight: 700;
 }
 .console-module__body {
   display: flex;
@@ -1129,13 +1132,16 @@ input[type='range'] {
   align-items: flex-end;
 }
 .console-module__sub-label {
-  font-size: 9px;
-  letter-spacing: 0.1em;
+  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-size: 8px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(247, 240, 220, 0.5);
-  align-self: flex-end;
-  padding-bottom: 14px;
-  width: 24px;
+  align-self: stretch;
+  text-align: center;
+  margin-top: 2px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(247, 240, 220, 0.1);
 }
 .console-module__arrow {
   position: absolute;
