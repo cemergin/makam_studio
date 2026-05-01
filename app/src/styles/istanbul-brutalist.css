@@ -719,6 +719,106 @@ input[type='range'] {
   padding: 0.2rem 0.4rem;
 }
 
+/* === Machine panel — collapsible sections + pill groups ============= */
+
+.synth-section {
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.10);
+  display: flex;
+  flex-direction: column;
+}
+
+.synth-section__toggle {
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: rgba(0, 0, 0, 0.18);
+  border: 0;
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.synth-section__chev {
+  font-size: 0.85rem;
+  color: var(--cream);
+}
+
+.synth-section__body {
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  border-top: 1px solid var(--line);
+}
+
+.synth-subtitle {
+  margin: 0.4rem 0 0;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.synth-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.synth-row__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--cream);
+}
+
+.synth-pill-group {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.synth-pill {
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--cream);
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.synth-pill:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.synth-pill[aria-pressed='true'] {
+  background: var(--saffron);
+  color: #000;
+  border-color: #000;
+}
+
+.synth-select {
+  font: inherit;
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--cream);
+  border: 1px solid var(--line);
+  padding: 0.2rem 0.4rem;
+}
+
 .audio-resume {
   margin: 0;
   padding: 0.6rem 0.9rem;

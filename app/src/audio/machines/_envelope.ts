@@ -1,9 +1,9 @@
-// Shared ADSR + VoiceHandle helpers used by every voice's sustained
+// Shared ADSR + MachineHandle helpers used by every machine's sustained
 // variant. Keeps the envelope behavior consistent: attack to peak,
 // decay to sustain × peak, hold at sustain until release(), then
 // exponential ramp to silence over R.
 
-import type { ADSR, VoiceHandle } from '../qanun-voice';
+import type { ADSR, MachineHandle } from '../qanun-machine';
 
 /** Schedule the attack-decay portion of an ADSR envelope on a gain node.
  *  After this completes, env.gain holds at sustain × peak indefinitely. */
@@ -24,14 +24,14 @@ export function scheduleAttackDecay(
 }
 
 /** Build a release function that ramps the env to silence over R, then
- *  invokes the cleanup callback. Returns the standard VoiceHandle. */
-export function makeVoiceHandle(
+ *  invokes the cleanup callback. Returns the standard MachineHandle. */
+export function makeMachineHandle(
   ctx: AudioContext,
   env: GainNode,
   adsr: ADSR,
   cleanup: () => void,
   setFrequency?: (hz: number, glideMs?: number) => void,
-): VoiceHandle {
+): MachineHandle {
   let released = false;
   const release = () => {
     if (released) return;

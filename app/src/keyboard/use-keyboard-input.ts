@@ -25,8 +25,12 @@
 
 import { useEffect, useRef } from 'react';
 import { centsToHz, nearestMandalPosition, stepMandalIndex } from '../tuning/cents-math';
-import { triggerVoice, triggerVoiceSustained, type VoiceId, type VoiceHandle, type ADSR } from '../audio/voices';
-import { startSustainedDrone, type DroneHandle } from '../audio/voices/sustained-drone';
+import {
+  triggerMachine, triggerMachineSustained,
+  type MachineId, type MachineHandle, type ADSR,
+  type FilterConfig, type FilterEnv, type LfoConfig,
+} from '../audio/machines';
+import { startSustainedDrone, type DroneHandle } from '../audio/machines/sustained-drone';
 import type { MaqamPreset } from '../tuning/types';
 import type { QanunState } from '../qanun/use-qanun-state';
 import {
@@ -37,13 +41,34 @@ import {
   resolveStringIndex,
 } from './keyboard-layout';
 
+/** Public registry handle exposed via `externalRef` so non-keyboard
+ *  callers (mouse / pointer / touch) can register a sustained note
+ *  that participates in slide / canonical / pin / revert logic exactly
+ *  like a keyboard-held note. The caller decides when to invoke
+ *  releaseExternal(id). */
+export interface ExternalNoteRegistry {
+  registerExternalNote(args: {
+    /** Unique key for this note (caller-chosen, e.g. `mouse:${stringIndex}`). */
+    id: string;
+    handle: MachineHandle;
+    stringIndex: number;
+    baseHz: number;
+    baseMandalIdx: number;
+  }): void;
+  releaseExternal(id: string): void;
+}
+
 interface UseKeyboardInputArgs {
   audioContext: AudioContext;
   destination: AudioNode;
-  voiceId: VoiceId;
+  machineId: MachineId;
   brightness: number;
   body: number;
   adsr: ADSR;
+  filter: FilterConfig;
+  filterEnv: FilterEnv;
+  lfo1: LfoConfig;
+  lfo2: LfoConfig;
   maqam: MaqamPreset;
   kararHz: number;
   state: QanunState;
@@ -62,10 +87,13 @@ interface UseKeyboardInputArgs {
   onSelectMaqam?: (index: number) => void;
   /** Octave offset for the Space-hold drone. Multiplies drone freq by 2^n. */
   droneOctave?: number;
+  /** Optional ref the hook fills with a registry the parent can use to
+   *  push/pop mouse-held notes into the SAME slide/pin/canonical map. */
+  externalRef?: { current: ExternalNoteRegistry | null };
 }
 
 interface HeldNote {
-  handle: VoiceHandle;
+  handle: MachineHandle;
   stringIndex: number;
   baseHz: number;             // pitch at keydown time
   currentHz: number;          // current sounding pitch (after any modifier slide)
@@ -175,7 +203,7 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       const hz = centsToHz(a.kararHz, initialCents);
       const baseHz = centsToHz(a.kararHz, baseCents);
 
-      const handle = triggerVoiceSustained(a.voiceId, {
+      const handle = triggerMachineSustained(a.machineId, {
         audioContext: a.audioContext,
         destination: a.destination,
         frequencyHz: hz,
@@ -183,6 +211,10 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         brightness: a.brightness,
         body: a.body,
         adsr: a.adsr,
+        filter: a.filter,
+        filterEnv: a.filterEnv,
+        lfo1: a.lfo1,
+        lfo2: a.lfo2,
       });
 
       heldNotesRef.current.set(code, {
@@ -583,16 +615,50 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
+
+    // Expose an external-note registry so mouse / pointer / touch
+    // callers can register a sustained note that participates in the
+    // SAME slide / canonical / pin / revert logic as keyboard-held
+    // notes. The id chosen by the caller (e.g. `mouse:${stringIndex}`)
+    // becomes a key in `heldNotesRef` exactly like a keyboard code.
+    if (argsRef.current.externalRef) {
+      argsRef.current.externalRef.current = {
+        registerExternalNote({ id, handle, stringIndex, baseHz, baseMandalIdx }) {
+          // If a previous note exists under this id, release it first.
+          const prev = heldNotesRef.current.get(id);
+          if (prev) prev.handle.release();
+          heldNotesRef.current.set(id, {
+            handle,
+            stringIndex,
+            baseHz,
+            currentHz: baseHz,
+            baseMandalIdx,
+            currentMandalIdx: baseMandalIdx,
+            pendingSource: null,
+          });
+          activeStringRef.current = stringIndex;
+          argsRef.current.onPluck?.(stringIndex);
+          emitSustainingChange();
+        },
+        releaseExternal(id) {
+          releaseScaleNote(id);
+        },
+      };
+    }
+
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
       releaseAllNotes();
       releaseDrone();
+      if (argsRef.current.externalRef) {
+        argsRef.current.externalRef.current = null;
+      }
     };
   }, []);
 
-  // The `triggerVoice` import is used inside the effect via
-  // triggerVoiceSustained. Keep a reference so eslint doesn't whine.
-  void triggerVoice;
+  // The `triggerMachine` import is used inside the effect via
+  // triggerMachineSustained. Keep a reference so eslint doesn't whine.
+  void triggerMachine;
 }

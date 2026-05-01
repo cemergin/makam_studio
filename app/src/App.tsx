@@ -19,23 +19,79 @@ import { QanunInstrument } from './qanun/QanunInstrument';
 import { SynthControls } from './synth/SynthControls';
 import { FxControls } from './synth/FxControls';
 import { KeyboardOverlay } from './keyboard/KeyboardOverlay';
-import type { VoiceId, ADSR } from './audio/voices';
+import type {
+  MachineId, ADSR, FilterConfig, FilterEnv, LfoConfig,
+} from './audio/machines';
 
 const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'] as const;
+
+/** Per-machine config bundle held in App state. Switching the active
+ *  machine restores that machine's last config (so a user's filter
+ *  tweak on the qanun isn't clobbered when they jump to vapor-pluck). */
+interface MachineConfig {
+  ampAdsr: ADSR;
+  filter: FilterConfig;
+  filterEnv: FilterEnv;
+  lfo1: LfoConfig;
+  lfo2: LfoConfig;
+  brightness: number;
+  body: number;
+}
+
+/** Sensible defaults per machine. The values mirror each machine's
+ *  internal "if not provided" defaults so the UI shows reality. */
+const MACHINE_DEFAULTS: Record<MachineId, MachineConfig> = {
+  'qanun': {
+    ampAdsr:   { a: 0.005, d: 0.4, s: 0.5, r: 0.5 },
+    filter:    { type: 'lp', cutoff: 6000, q: 0.7 },
+    filterEnv: { a: 0.005, d: 0.8, s: 0.0, r: 0.2, amount: 0.3 },
+    lfo1:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
+    lfo2:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
+    brightness: 0.6,
+    body: 0.3,
+  },
+  'vapor-pluck': {
+    ampAdsr:   { a: 0.005, d: 0.4, s: 0.5, r: 0.5 },
+    filter:    { type: 'lp', cutoff: 1500, q: 0.7 },
+    filterEnv: { a: 0.005, d: 0.6, s: 0.0, r: 0.3, amount: 0.6 },
+    lfo1:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
+    lfo2:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
+    brightness: 0.6,
+    body: 0.3,
+  },
+  'synthwave-saw': {
+    ampAdsr:   { a: 0.005, d: 0.4, s: 0.5, r: 0.5 },
+    // Cutoff at ~3 kHz is a reasonable mid-range default; the per-note
+    // 2*freq + brightness*6kHz formula ran when the slider was UI-less.
+    // Now the user can override via the UI; default sits roughly there.
+    filter:    { type: 'lp', cutoff: 3000, q: 1.5 },
+    filterEnv: { a: 0.005, d: 0.5, s: 0.2, r: 0.3, amount: 0.4 },
+    lfo1:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
+    lfo2:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
+    brightness: 0.6,
+    body: 0.3,
+  },
+  'dream-pad': {
+    ampAdsr:   { a: 1.0, d: 1.0, s: 0.7, r: 1.0 },
+    filter:    { type: 'bp', cutoff: 1800, q: 1.5 },
+    filterEnv: { a: 0.5, d: 1.0, s: 0.5, r: 1.0, amount: 0.0 },
+    lfo1:      { rate: 0.5, shape: 'sine', depth: 0, destination: 'off' },
+    lfo2:      { rate: 0.3, shape: 'sine', depth: 0, destination: 'off' },
+    brightness: 0.5,
+    body: 0.3,
+  },
+};
 
 export function App() {
   const { ctx, state: audioState, resume } = useAudioContext();
   const busRef = useRef<MasterBus | null>(null);
 
-  // Build the master bus once; recreate if the AudioContext is replaced
-  // (it isn't, but we guard anyway).
   if (!busRef.current) {
     busRef.current = createMasterBus(ctx);
   }
   const bus = busRef.current;
 
   // DEBUG: expose ctx + bus to window for live audio-path probing.
-  // Remove after the audio chain is verified working end-to-end.
   if (typeof window !== 'undefined') {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__ctx = ctx;
@@ -43,7 +99,6 @@ export function App() {
     (window as any).__bus = bus;
   }
 
-  // Tear down on unmount.
   useEffect(() => {
     return () => {
       busRef.current?.dispose();
@@ -54,10 +109,11 @@ export function App() {
 
   const [maqam, setMaqam] = useState<MaqamPreset>(RAST);
 
-  // Synth params.
-  const [voiceId, setVoiceId] = useState<VoiceId>('qanun');
-  const [brightness, setBrightness] = useState(0.6);
-  const [body, setBody] = useState(0.3);
+  // Active machine + per-machine config map. Switching machines
+  // restores that machine's last-used config.
+  const [machineId, setMachineId] = useState<MachineId>('qanun');
+  const [configs, setConfigs] = useState<Record<MachineId, MachineConfig>>(() => ({ ...MACHINE_DEFAULTS }));
+
   const [masterVolume, setMasterVolume] = useState(0.6);
   useEffect(() => {
     bus.setMasterVolume(masterVolume);
@@ -65,20 +121,17 @@ export function App() {
 
   const [tweaksOpen, setTweaksOpen] = useState(true);
 
-  // ADSR envelope. Default: instant attack, short decay to a moderate
-  // sustain, ~0.5s release. Held keys sustain at S until released.
-  const [adsr, setAdsr] = useState<ADSR>({ a: 0.005, d: 0.4, s: 0.5, r: 0.5 });
-
-  // Space-hold drone octave offset. -2..+2 octaves from the held pitch.
+  // Drone octave offset (-2..+2 octaves from the held pitch).
   const [droneOctave, setDroneOctave] = useState(0);
 
   // Karar transpose in semitones from the maqam's preset karar.
-  // 0 = preset karar; positive = up. The 12 chromatic buttons map to
-  // absolute note positions; we convert to a semitone offset relative
-  // to the preset karar so the offset survives maqam switches.
   const [kararSemitoneOffset, setKararSemitoneOffset] = useState(0);
 
   const maqamat = useMemo(() => ALL_MAQAMAT, []);
+
+  const cfg = configs[machineId];
+  const updateCfg = (patch: Partial<MachineConfig>) =>
+    setConfigs((prev) => ({ ...prev, [machineId]: { ...prev[machineId], ...patch } }));
 
   return (
     <div className="app">
@@ -122,9 +175,6 @@ export function App() {
         <div className="karar-bar" role="group" aria-label="Karar transpose">
           <span className="karar-bar__label">karar transpose</span>
           {NOTE_NAMES.map((n, i) => {
-            // i is semitones from C. We treat 0 = preset (no offset)
-            // when no offset has been set; the visual highlight tracks
-            // (kararSemitoneOffset mod 12).
             const offsetMod = ((kararSemitoneOffset % 12) + 12) % 12;
             const active = i === offsetMod;
             return (
@@ -162,10 +212,14 @@ export function App() {
           maqam={maqam}
           audioContext={ctx}
           destination={bus.input}
-          voiceId={voiceId}
-          brightness={brightness}
-          body={body}
-          adsr={adsr}
+          machineId={machineId}
+          brightness={cfg.brightness}
+          body={cfg.body}
+          adsr={cfg.ampAdsr}
+          filter={cfg.filter}
+          filterEnv={cfg.filterEnv}
+          lfo1={cfg.lfo1}
+          lfo2={cfg.lfo2}
           kararSemitoneOffset={kararSemitoneOffset}
           onMaqamSelect={(idx) => {
             const next = maqamat[idx];
@@ -195,17 +249,25 @@ export function App() {
             </button>
           )}
           <SynthControls
-            voiceId={voiceId}
-            brightness={brightness}
-            body={body}
+            machineId={machineId}
+            brightness={cfg.brightness}
+            body={cfg.body}
             masterVolume={masterVolume}
-            adsr={adsr}
+            adsr={cfg.ampAdsr}
+            filter={cfg.filter}
+            filterEnv={cfg.filterEnv}
+            lfo1={cfg.lfo1}
+            lfo2={cfg.lfo2}
             droneOctave={droneOctave}
-            onVoiceId={setVoiceId}
-            onBrightness={setBrightness}
-            onBody={setBody}
+            onMachineId={setMachineId}
+            onBrightness={(brightness) => updateCfg({ brightness })}
+            onBody={(body) => updateCfg({ body })}
             onMasterVolume={setMasterVolume}
-            onAdsr={setAdsr}
+            onAdsr={(ampAdsr) => updateCfg({ ampAdsr })}
+            onFilter={(filter) => updateCfg({ filter })}
+            onFilterEnv={(filterEnv) => updateCfg({ filterEnv })}
+            onLfo1={(lfo1) => updateCfg({ lfo1 })}
+            onLfo2={(lfo2) => updateCfg({ lfo2 })}
             onDroneOctave={setDroneOctave}
           />
           <FxControls bus={bus} />

@@ -37,7 +37,6 @@ export function startSustainedDrone(t: SustainedDroneTrigger): DroneHandle {
   const attack = 0.30;
   const release = 0.50;
 
-  // ---- Two sine oscillators: fundamental + softer perfect fifth -----
   const oscFund = ctx.createOscillator();
   oscFund.type = 'sine';
   oscFund.frequency.value = f;
@@ -47,21 +46,19 @@ export function startSustainedDrone(t: SustainedDroneTrigger): DroneHandle {
   oscFifth.frequency.value = f * 1.5;
 
   const fifthGain = ctx.createGain();
-  fifthGain.gain.value = 0.18; // quieter perfect-fifth shimmer
+  fifthGain.gain.value = 0.18;
 
   const sumGain = ctx.createGain();
   sumGain.gain.value = 1.0;
   oscFund.connect(sumGain);
   oscFifth.connect(fifthGain).connect(sumGain);
 
-  // ---- Output gain with attack envelope -----------------------------
   const outGain = ctx.createGain();
   outGain.gain.setValueAtTime(0.0001, t0);
   outGain.gain.linearRampToValueAtTime(peak, t0 + attack);
   sumGain.connect(outGain);
   outGain.connect(dest);
 
-  // ---- LFO on output gain ±15% --------------------------------------
   const lfo = ctx.createOscillator();
   lfo.type = 'sine';
   lfo.frequency.value = 0.25;
@@ -96,8 +93,6 @@ export function startSustainedDrone(t: SustainedDroneTrigger): DroneHandle {
     const now = ctx.currentTime;
     try {
       outGain.gain.cancelScheduledValues(now);
-      // Anchor the current gain value before ramping (Safari's exp ramp
-      // behaves badly without an explicit setValueAtTime).
       outGain.gain.setValueAtTime(Math.max(outGain.gain.value, 0.0001), now);
       outGain.gain.exponentialRampToValueAtTime(0.0001, now + release);
     } catch {
@@ -106,9 +101,6 @@ export function startSustainedDrone(t: SustainedDroneTrigger): DroneHandle {
     teardownTimer = setTimeout(teardown, Math.ceil(release * 1000) + 80);
   };
 
-  // No auto-release. Drone sustains indefinitely until the caller
-  // invokes release() (Space keyup, window blur, or component
-  // unmount via the keyboard hook's cleanup all do this).
   const wrappedRelease = () => {
     if (teardownTimer) clearTimeout(teardownTimer);
     teardownTimer = null;

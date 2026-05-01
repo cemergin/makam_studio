@@ -7,7 +7,12 @@
 // ~135¢ above Dügâh (a different absolute pitch); a pure-cents nearest
 // lookup would resolve it to "Kürdî" and label the row wrong. The
 // preset is the source of truth.
+//
+// Pluck input: the button uses pointer events (covers mouse + pen +
+// touch in a single API) so press / release on any device produces a
+// SUSTAINED note. Press → onPress; release / leave / cancel → onRelease.
 
+import { useRef } from 'react';
 import { resolveMaqamPerde } from '../tuning/perde-dictionary';
 import type { QanunString } from './use-qanun-state';
 import type { MandalPosition, MaqamPreset } from '../tuning/types';
@@ -27,13 +32,16 @@ interface Props {
   /** True if this string has been pinned via KeyL. */
   isPinned?: boolean;
   onStep: (step: 1 | -1) => void;
-  onPluck: () => void;
+  /** Pointer pressed on the pluck button — start a sustained note. */
+  onPress: () => void;
+  /** Pointer released / cancelled / left — release the sustained note. */
+  onRelease: () => void;
 }
 
 export function StringRow({
   s, legal, currentIndex, maqam,
   isKarar, isFlashing, isSustaining, isPinned,
-  onStep, onPluck,
+  onStep, onPress, onRelease,
 }: Props) {
   const perde = resolveMaqamPerde({
     rowDegree: s.rowDegree,
@@ -62,6 +70,32 @@ export function StringRow({
     .filter(Boolean)
     .join(' ');
 
+  // Track whether a pointer-down on THIS button is currently active so
+  // we don't fire onRelease for a stray onPointerLeave when the pointer
+  // never went down here (e.g. user drags from another row).
+  const activeRef = useRef(false);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    activeRef.current = true;
+    // capture so onPointerUp fires reliably even if the user drags
+    // outside the button bounds before releasing.
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    onPress();
+  };
+  const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!activeRef.current) return;
+    activeRef.current = false;
+    try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* */ }
+    onRelease();
+  };
+  const handlePointerCancel = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!activeRef.current) return;
+    activeRef.current = false;
+    try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* */ }
+    onRelease();
+  };
+
   return (
     <div className={rowClass}>
       <div className="string-row__mandal">
@@ -80,7 +114,15 @@ export function StringRow({
       <button
         type="button"
         className="string-row__pluck"
-        onClick={onPluck}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        // Some browsers fire pointer-leave instead of pointer-cancel
+        // when capture is dropped (e.g. the element disappears). Treat
+        // it as a release to avoid stuck notes.
+        onPointerLeave={handlePointerCancel}
+        // Suppress default context menu on long-press touch.
+        onContextMenu={(e) => e.preventDefault()}
         aria-label={`Pluck ${perde.name}`}
       >
         <span className="string-row__pluck-line" aria-hidden="true" />

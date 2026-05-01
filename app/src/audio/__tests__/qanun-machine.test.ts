@@ -1,4 +1,4 @@
-// Smoke test for the K-S qanun voice. Pluck a 220Hz string for 200ms in
+// Smoke test for the qanun machine. Pluck a 220Hz string for 200ms in
 // an OfflineAudioContext, verify the output is non-silent, peak ≤ 1.0,
 // and the spectral peak sits near 220Hz.
 //
@@ -6,13 +6,13 @@
 // happy-dom). Browser-mode Vitest will run this for real in v2.
 
 import { describe, expect, it } from 'vitest';
-import { triggerQanun } from '../qanun-voice';
+import { triggerQanun } from '../qanun-machine';
 
 const HAS_OAC = typeof globalThis.OfflineAudioContext !== 'undefined';
 
 if (!HAS_OAC) {
   // eslint-disable-next-line no-console
-  console.log('[qanun-voice.test] OfflineAudioContext not available — skipping engine-level tests.');
+  console.log('[qanun-machine.test] OfflineAudioContext not available — skipping engine-level tests.');
 }
 
 describe('triggerQanun', () => {

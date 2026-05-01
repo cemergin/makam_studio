@@ -1,29 +1,29 @@
-// Smoke test for every registered voice. Trigger a 440Hz note in an
+// Smoke test for every registered machine. Trigger a 440Hz note in an
 // OfflineAudioContext, render 100ms, verify non-silent and non-clipping.
 //
 // Skips when OfflineAudioContext is unavailable.
 
 import { describe, expect, it } from 'vitest';
-import { triggerVoice, VOICES } from '../voices';
+import { triggerMachine, MACHINES } from '../machines';
 
 const HAS_OAC = typeof globalThis.OfflineAudioContext !== 'undefined';
 
 if (!HAS_OAC) {
   // eslint-disable-next-line no-console
-  console.log('[voices.test] OfflineAudioContext not available — skipping engine-level tests.');
+  console.log('[machines.test] OfflineAudioContext not available — skipping engine-level tests.');
 }
 
-describe('triggerVoice — every registered voice', () => {
-  for (const v of VOICES) {
-    it.skipIf(!HAS_OAC)(`${v.id}: produces non-silent, non-clipping output`, async () => {
+describe('triggerMachine — every registered machine', () => {
+  for (const m of MACHINES) {
+    it.skipIf(!HAS_OAC)(`${m.id}: produces non-silent, non-clipping output`, async () => {
       const sampleRate = 44_100;
       // 100ms is too short for the dream-pad's 2s attack to reach
       // appreciable level — give pads more headroom (300ms still under
       // their attack but enough to register some signal).
-      const duration = v.id === 'dream-pad' ? 0.3 : 0.1;
+      const duration = m.id === 'dream-pad' ? 0.3 : 0.1;
       const ctx = new OfflineAudioContext(1, Math.floor(duration * sampleRate), sampleRate);
 
-      triggerVoice(v.id, {
+      triggerMachine(m.id, {
         audioContext: ctx as unknown as AudioContext,
         destination: ctx.destination,
         frequencyHz: 440,
@@ -43,8 +43,8 @@ describe('triggerVoice — every registered voice', () => {
         sumSq += data[i] * data[i];
       }
       const rms = Math.sqrt(sumSq / data.length);
-      expect(rms, `voice ${v.id} rms`).toBeGreaterThan(0.0001);
-      expect(peak, `voice ${v.id} peak`).toBeLessThanOrEqual(1.0);
+      expect(rms, `machine ${m.id} rms`).toBeGreaterThan(0.0001);
+      expect(peak, `machine ${m.id} peak`).toBeLessThanOrEqual(1.0);
     });
   }
 });
