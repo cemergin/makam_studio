@@ -51,6 +51,12 @@ interface UseKeyboardInputArgs {
   /** Called whenever the set of currently-sustaining string indices
    *  changes (note start/end). Use to drive a persistent visual. */
   onSustainingChange?: (indices: ReadonlySet<number>) => void;
+  /** Called whenever the set of pinned string indices changes
+   *  (KeyL pins / unpins the active string). */
+  onPinnedChange?: (indices: ReadonlySet<number>) => void;
+  /** A ref shared with the parent so the hook can target the most-
+   *  recently-plucked string from EITHER mouse or keyboard. */
+  lastPluckedRef?: { current: number | null };
 }
 
 interface HeldNote {
@@ -399,7 +405,9 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
     const handlePinKey = (code: string): boolean => {
       if (code !== 'KeyL') return false;
       const a = argsRef.current;
-      const stringIndex = activeStringRef.current;
+      // Prefer the shared lastPluckedRef (mouse OR keyboard), fall back
+      // to the keyboard-internal activeStringRef.
+      const stringIndex = a.lastPluckedRef?.current ?? activeStringRef.current;
       if (stringIndex == null) return true;
       const s = a.state.strings[stringIndex];
       if (!s) return true;
@@ -410,7 +418,6 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       const { index: cur } = nearestMandalPosition(s.currentCentsMid, legal);
 
       if (pinnedMandalRef.current.has(stringIndex)) {
-        // Already pinned → unpin and slide state to maqam canonical.
         pinnedMandalRef.current.delete(stringIndex);
         const canonicalIdx = legal.findIndex((p) => p.is_canonical);
         const target = canonicalIdx >= 0 ? canonicalIdx : cur;
@@ -421,19 +428,18 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
             a.state.stepMandal(stringIndex, dir);
           }
         }
-        // Update any held note on this string so its currentMandalIdx
-        // tracks the new state.
         heldNotesRef.current.forEach((n) => {
           if (n.stringIndex === stringIndex) n.currentMandalIdx = target;
         });
       } else {
-        // Pin at current position. Held notes' baseMandalIdx is updated
-        // so future releases revert to the pin instead of the original
-        // canonical (avoids fighting between pin and base on release).
         pinnedMandalRef.current.set(stringIndex, cur);
         heldNotesRef.current.forEach((n) => {
           if (n.stringIndex === stringIndex) n.baseMandalIdx = cur;
         });
+      }
+      // Emit pin-state snapshot.
+      if (a.onPinnedChange) {
+        a.onPinnedChange(new Set(pinnedMandalRef.current.keys()));
       }
       return true;
     };

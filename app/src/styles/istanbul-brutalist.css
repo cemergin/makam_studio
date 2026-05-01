@@ -884,3 +884,14 @@ input[type='range'] {
 .string-row--flashing.string-row--sustaining {
   animation: stringFlash 250ms ease-out, stringPulse 1.6s 250ms ease-in-out infinite;
 }
+
+/* Pinned string indicator (📌 badge) -------------------------------- */
+.string-row__pin-badge {
+  margin-left: 6px;
+  font-size: 12px;
+  filter: saturate(1.2);
+}
+.string-row--pinned .string-row__perde {
+  border-left: 2px solid var(--saffron);
+  padding-left: 4px;
+}

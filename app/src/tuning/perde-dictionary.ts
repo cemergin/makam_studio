@@ -96,6 +96,8 @@ const LOW_RENAME: Record<string, string> = {
   'Çârgâh':  'Kaba Çârgâh',
 };
 
+import type { MandalPosition, MaqamPreset } from './types';
+
 export interface ResolvedPerde {
   /** The perde name in the appropriate register. */
   name: string;
@@ -104,6 +106,68 @@ export interface ResolvedPerde {
   /** Cents inflection from the canonical perde, signed, rounded to
    *  nearest integer. 0 means the pitch is exactly on the canonical. */
   inflection: number;
+}
+
+/** Resolve a qanun-string's perde using the MAQAM PRESET as source of
+ *  truth for canonical names. The dictionary-based `resolvePerde` is a
+ *  fallback for when only cents are available; this function should be
+ *  preferred whenever you have the row + legal position info, because
+ *  maqam-specific tunings (e.g. Uşşâk's Segâh at ~135¢ flat from
+ *  Dügâh) don't match the AEU dictionary's Segâh and would resolve to
+ *  the wrong perde otherwise.
+ *
+ *  Algorithm:
+ *    1. Find the maqam row for `rowDegree`. Its `canonical_name` is the
+ *       authoritative perde name for that scale degree.
+ *    2. If the current mandal position is canonical → use that name.
+ *    3. If the position has a non-comma label (e.g. "Bûselik") →
+ *       use the label as an alternate name.
+ *    4. Otherwise (comma adjustment) → use canonical_name and report
+ *       the cents inflection.
+ *    5. Apply LOW/TIZ rename based on the player-relative octave. */
+export function resolveMaqamPerde(
+  ctx: {
+    rowDegree: number;
+    currentMandalIdx: number;
+    legal: readonly MandalPosition[];
+    octave: 'low' | 'mid' | 'tiz';
+    currentCentsMid: number;
+  },
+  maqam: MaqamPreset,
+): ResolvedPerde {
+  const row = maqam.rows.find((r) => r.degree === ctx.rowDegree);
+  if (!row) {
+    return { name: '?', octave: ctx.octave, inflection: 0 };
+  }
+
+  const pos = ctx.legal[ctx.currentMandalIdx];
+  let baseName: string = row.canonical_name;
+  if (pos) {
+    const label = pos.label ?? '';
+    const isComma = /^[+\-]\d/.test(label) || label === 'canonical';
+    if (pos.is_canonical) {
+      baseName = row.canonical_name;
+    } else if (label && !isComma) {
+      baseName = label;
+    } else {
+      // Comma adjustment from canonical — keep the row's canonical name.
+      baseName = row.canonical_name;
+    }
+  }
+
+  let displayName = baseName;
+  if (ctx.octave === 'tiz' && TIZ_RENAME[baseName]) {
+    displayName = TIZ_RENAME[baseName];
+  } else if (ctx.octave === 'low' && LOW_RENAME[baseName]) {
+    displayName = LOW_RENAME[baseName];
+  }
+
+  const inflection = Math.round(ctx.currentCentsMid - row.canonical_cents);
+  return {
+    name: displayName,
+    octave: ctx.octave,
+    inflection,
+  };
 }
 
 /** Look up a perde's cents-above-Rast by name. Returns 0 if not found

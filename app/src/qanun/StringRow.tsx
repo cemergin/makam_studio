@@ -1,30 +1,48 @@
 // One string row in the qanun grid.
 // Three columns: mandal track | perde + cents readout | pluck button.
+//
+// Perde naming is sourced from the active maqam preset (each row's
+// canonical_name) — NOT from the AEU dictionary's nearest match. The
+// dictionary's Segâh sits at ~408¢ above Rast, but Uşşâk's Segâh is
+// ~135¢ above Dügâh (a different absolute pitch); a pure-cents nearest
+// lookup would resolve it to "Kürdî" and label the row wrong. The
+// preset is the source of truth.
 
-import { resolvePerde } from '../tuning/perde-dictionary';
+import { resolveMaqamPerde } from '../tuning/perde-dictionary';
 import type { QanunString } from './use-qanun-state';
-import type { MandalPosition } from '../tuning/types';
+import type { MandalPosition, MaqamPreset } from '../tuning/types';
 import { MandalTrack } from './MandalTrack';
 
 interface Props {
   s: QanunString;
   legal: readonly MandalPosition[];
   currentIndex: number;
-  /** Karar perde's cents above Rast — shifts perde names so a
-   *  Dügâh-karar maqam labels its karar as "Dügâh", not "Rast". */
-  kararCentsAboveRast: number;
+  /** The active maqam — used to look up the row's canonical perde name. */
+  maqam: MaqamPreset;
   isKarar: boolean;
+  /** True for ~250ms after every trigger (mouse or key). */
   isFlashing?: boolean;
   /** True while a held key is sounding this string. Persistent glow. */
   isSustaining?: boolean;
+  /** True if this string has been pinned via KeyL. */
+  isPinned?: boolean;
   onStep: (step: 1 | -1) => void;
   onPluck: () => void;
 }
 
 export function StringRow({
-  s, legal, currentIndex, kararCentsAboveRast, isKarar, isFlashing, isSustaining, onStep, onPluck,
+  s, legal, currentIndex, maqam,
+  isKarar, isFlashing, isSustaining, isPinned,
+  onStep, onPluck,
 }: Props) {
-  const perde = resolvePerde(s.soundingCents, kararCentsAboveRast);
+  const perde = resolveMaqamPerde({
+    rowDegree: s.rowDegree,
+    currentMandalIdx: currentIndex,
+    legal,
+    octave: s.octave,
+    currentCentsMid: s.currentCentsMid,
+  }, maqam);
+
   const inflectionStr =
     perde.inflection === 0
       ? ''
@@ -38,6 +56,7 @@ export function StringRow({
     s.isModified ? 'string-row--modified' : '',
     isFlashing ? 'string-row--flashing' : '',
     isSustaining ? 'string-row--sustaining' : '',
+    isPinned ? 'string-row--pinned' : '',
     `string-row--${s.octave}`,
   ]
     .filter(Boolean)
@@ -56,6 +75,7 @@ export function StringRow({
         <span className="string-row__cents">
           {Math.round(s.soundingCents)}¢
         </span>
+        {isPinned && <span className="string-row__pin-badge" aria-label="Pinned">📌</span>}
       </div>
       <button
         type="button"

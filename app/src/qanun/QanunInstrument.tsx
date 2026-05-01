@@ -9,7 +9,6 @@ import { useCallback, useRef, useState } from 'react';
 import type { MaqamPreset } from '../tuning/types';
 import { centsToHz } from '../tuning/cents-math';
 import { defaultKararHz } from '../tuning/maqamat';
-import { lookupPerdeCents } from '../tuning/perde-dictionary';
 import { triggerVoice, type VoiceId, type ADSR } from '../audio/voices';
 import { StringRow } from './StringRow';
 import { useQanunState } from './use-qanun-state';
@@ -33,19 +32,21 @@ export function QanunInstrument({
 }: Props) {
   const state = useQanunState(maqam);
   const kararHz = defaultKararHz(maqam) * Math.pow(2, kararSemitoneOffset / 12);
-  // Absolute cents of the maqam's karar perde above Rast — used by the
-  // perde dictionary to label notes correctly for non-Rast karars
-  // (Dügâh, Segâh, etc.).
-  const kararCentsAboveRast = lookupPerdeCents(maqam.karar_perde);
 
-  // Two visual layers for played strings:
+  // Three visual layers for played strings:
   //   - flashIndices  → 250ms saffron pulse on every trigger (mouse + key)
   //   - sustainingIndices → persistent glow while a key is held
+  //   - pinnedIndices → 📌 badge on strings pinned via KeyL
   const [flashIndices, setFlashIndices] = useState<ReadonlySet<number>>(new Set());
   const flashTimers = useRef<Map<number, number>>(new Map());
   const [sustainingIndices, setSustainingIndices] = useState<ReadonlySet<number>>(new Set());
+  const [pinnedIndices, setPinnedIndices] = useState<ReadonlySet<number>>(new Set());
+  // Shared with the keyboard hook so KeyL targets the most-recently-
+  // plucked string regardless of source (mouse OR keyboard).
+  const lastPluckedRef = useRef<number | null>(null);
 
   const flashString = useCallback((stringIndex: number) => {
+    lastPluckedRef.current = stringIndex;
     setFlashIndices((prev) => {
       const next = new Set(prev);
       next.add(stringIndex);
@@ -78,6 +79,8 @@ export function QanunInstrument({
     state,
     onPluck: flashString,
     onSustainingChange: setSustainingIndices,
+    onPinnedChange: setPinnedIndices,
+    lastPluckedRef,
   });
 
   const pluckString = (stringIndex: number) => {
@@ -140,10 +143,11 @@ export function QanunInstrument({
             s={s}
             legal={state.legalPositions(s.index)}
             currentIndex={state.currentMandalIndex(s.index)}
-            kararCentsAboveRast={kararCentsAboveRast}
+            maqam={maqam}
             isKarar={isKarar}
             isFlashing={flashIndices.has(s.index)}
             isSustaining={sustainingIndices.has(s.index)}
+            isPinned={pinnedIndices.has(s.index)}
             onStep={(step) => previewMandalStep(s.index, step)}
             onPluck={() => pluckString(s.index)}
           />
