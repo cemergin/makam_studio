@@ -1261,10 +1261,30 @@ input[type='range'] {
   border: 1px solid rgba(247, 240, 220, 0.2);
   padding: 4px 6px;
 }
+.osc-module__machine {
+  display: flex;
+  justify-content: stretch;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(247, 240, 220, 0.08);
+}
+.osc-module__select--wide select {
+  min-width: 110px;
+}
+.osc-module__columns {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
 .osc-module__vstack {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  align-items: center;
+}
+.osc-module__vstack--machine {
+  border-left: 1px solid rgba(247, 240, 220, 0.08);
+  padding-left: 12px;
   align-items: center;
 }
 

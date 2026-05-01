@@ -70,8 +70,8 @@ export function OscModule({
 
   return (
     <ConsoleModule title="OSC">
-      <div className="console-module__row">
-        <label className="osc-module__select">
+      <div className="osc-module__machine">
+        <label className="osc-module__select osc-module__select--wide">
           <span>machine</span>
           <select
             value={machineId}
@@ -80,6 +80,8 @@ export function OscModule({
             {MACHINES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
           </select>
         </label>
+      </div>
+      <div className="osc-module__columns">
         <div className="osc-module__vstack">
           <label className="osc-module__select">
             <span>voice</span>
@@ -109,7 +111,8 @@ export function OscModule({
           )}
         </div>
         {MACHINE_PARAMS[machineId].length > 0 && (
-          <div className="osc-module__vstack">
+          <div className="osc-module__vstack osc-module__vstack--machine">
+            <span className="console-module__sub-label">MACHINE</span>
             {MACHINE_PARAMS[machineId].map(renderMachineParam)}
           </div>
         )}
