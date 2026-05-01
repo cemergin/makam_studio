@@ -187,6 +187,35 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
     const releaseScaleNote = (code: string) => {
       const note = heldNotesRef.current.get(code);
       if (!note) return;
+
+      // Revert the qanun state to the note's baseMandalIdx (canonical
+      // at note-start time) so the string doesn't stay visually
+      // modified after the note ends. This is what makes subsequent
+      // plucks compute their "canonical" from the actual maqam
+      // canonical instead of from a stuck-modified position — the bug
+      // the user just called out.
+      //
+      // Skip the revert if ANOTHER held key still holds this string
+      // (e.g. KeyG and KeyQ both = degree 5). The other holder's
+      // local currentMandalIdx tracking would get stale otherwise.
+      let otherHolderExists = false;
+      heldNotesRef.current.forEach((other, otherCode) => {
+        if (otherCode !== code && other.stringIndex === note.stringIndex) {
+          otherHolderExists = true;
+        }
+      });
+
+      if (!otherHolderExists) {
+        const a = argsRef.current;
+        const stepsBack = note.baseMandalIdx - note.currentMandalIdx;
+        if (stepsBack !== 0) {
+          const dir = (stepsBack > 0 ? 1 : -1) as 1 | -1;
+          for (let i = 0; i < Math.abs(stepsBack); i++) {
+            a.state.stepMandal(note.stringIndex, dir);
+          }
+        }
+      }
+
       note.handle.release();
       heldNotesRef.current.delete(code);
       emitSustainingChange();
