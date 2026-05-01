@@ -299,11 +299,9 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       // (user held modifier through note-start; modifier release should
       // pull the note back to its canonical pitch).
       revertHeldNotesWithPendingSource(code, 40);
-      // Pending arm clears if its source modifier just released — no
-      // hanging arm after the modifier is gone.
-      if (pendingDeltaRef.current.source === code) {
-        pendingDeltaRef.current = { delta: 0, source: null };
-      }
+      // Pending arm is STICKY — survives the source modifier's keyup.
+      // The tap-arm-then-play pattern depends on this. Cleared only by
+      // a scale-key consumption or by pressing J (canonical = delta 0).
       return true;
     };
 
