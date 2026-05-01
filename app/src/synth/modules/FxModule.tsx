@@ -19,7 +19,7 @@ const FX_LABELS: Record<FxKey, string> = {
   filter: 'flt', overdrive: 'od', reverb: 'rev', delay: 'dly',
 };
 
-function FxBlock({ fx, module, bus }: { fx: FxKey; module: ControllableModule; bus: MasterBus }) {
+function FxRow({ fx, module, bus }: { fx: FxKey; module: ControllableModule; bus: MasterBus }) {
   const [bypass, setBypass] = useState(true);
   const [values, setValues] = useState<Record<string, number | string>>(() => {
     const init: Record<string, number | string> = {};
@@ -38,7 +38,7 @@ function FxBlock({ fx, module, bus }: { fx: FxKey; module: ControllableModule; b
   };
 
   const renderParam = (p: ParamSpec) => {
-    if (p.kind === 'discrete' && p.options) return null; // FX have continuous-only in practice; degrade gracefully
+    if (p.kind === 'discrete' && p.options) return null;
     const min = p.min ?? 0, max = p.max ?? 1;
     const v = typeof values[p.name] === 'number' ? values[p.name] as number : Number(p.default);
     return (
@@ -50,25 +50,25 @@ function FxBlock({ fx, module, bus }: { fx: FxKey; module: ControllableModule; b
         max={max}
         defaultValue={Number(p.default)}
         unit={p.unit ?? ''}
+        size={36}
         onChange={(nv) => updateValue(p.name, nv)}
       />
     );
   };
 
   return (
-    <div className={`fx-block ${bypass ? 'fx-block--off' : ''}`}>
-      <header className="fx-block__head">
-        <span>{FX_LABELS[fx]}</span>
-        <button
-          type="button"
-          className="fx-block__bypass"
-          onClick={toggleBypass}
-          aria-pressed={!bypass}
-        >
-          {bypass ? 'OFF' : 'ON'}
-        </button>
-      </header>
-      <div className="fx-block__params">
+    <div className={`fx-row ${bypass ? 'fx-row--off' : ''}`}>
+      <button
+        type="button"
+        className={`fx-row__bypass ${bypass ? '' : 'fx-row__bypass--on'}`}
+        onClick={toggleBypass}
+        aria-pressed={!bypass}
+        title={bypass ? 'Off (click to enable)' : 'On (click to bypass)'}
+      >
+        <span className="fx-row__lamp" />
+      </button>
+      <span className="fx-row__name">{FX_LABELS[fx]}</span>
+      <div className="fx-row__params">
         {module.params.map(renderParam)}
       </div>
     </div>
@@ -78,9 +78,9 @@ function FxBlock({ fx, module, bus }: { fx: FxKey; module: ControllableModule; b
 export function FxModule({ bus }: Props) {
   return (
     <ConsoleModule title="MASTER FX">
-      <div className="fx-module">
+      <div className="fx-stack">
         {FX_LIST.map((fx) => (
-          <FxBlock key={fx} fx={fx} module={bus.effects[fx]} bus={bus} />
+          <FxRow key={fx} fx={fx} module={bus.effects[fx]} bus={bus} />
         ))}
       </div>
     </ConsoleModule>
