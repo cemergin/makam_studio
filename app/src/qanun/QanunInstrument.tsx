@@ -5,7 +5,7 @@
 // the bundled HTML reference). Karar rows are highlighted across the
 // full width.
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MaqamPreset } from '../tuning/types';
 import { centsToHz, nearestMandalPosition } from '../tuning/cents-math';
 import { defaultKararHz } from '../tuning/maqamat';
@@ -177,6 +177,73 @@ export function QanunInstrument({
     externalRef.current?.releaseExternal(id);
   }, []);
 
+  // Document-level pointer handling for drag-strum. Per-button pointer
+  // capture (the previous approach) pins events to the originally-
+  // pressed button — drag-strum needs to follow the pointer across
+  // rows, so we listen at the instrument root + use elementFromPoint
+  // to identify the pluck button under the pointer at every move.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    // Currently sounding string under the pointer (single-pointer model).
+    let current: number | null = null;
+    let pointerActive = false;
+
+    const findStringIndexAtPoint = (x: number, y: number): number | null => {
+      const el = document.elementFromPoint(x, y);
+      if (!el) return null;
+      const btn = el.closest('.string-row__pluck') as HTMLElement | null;
+      if (!btn) return null;
+      const v = btn.getAttribute('data-string-index');
+      if (v == null) return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      const idx = findStringIndexAtPoint(e.clientX, e.clientY);
+      if (idx == null) return;
+      e.preventDefault();
+      pointerActive = true;
+      current = idx;
+      pressString(idx);
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!pointerActive) return;
+      const idx = findStringIndexAtPoint(e.clientX, e.clientY);
+      if (idx === current) return;
+      if (current != null) releaseString(current);
+      current = idx;
+      if (idx != null) pressString(idx);
+    };
+
+    const onPointerUp = () => {
+      if (!pointerActive) return;
+      pointerActive = false;
+      if (current != null) releaseString(current);
+      current = null;
+    };
+
+    // Attach pointerdown to root only; move + up listen on window so a
+    // drag that leaves the instrument doesn't hang the gesture.
+    root.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+
+    return () => {
+      root.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      if (current != null) releaseString(current);
+    };
+  }, [pressString, releaseString]);
+
   const previewMandalStep = (stringIndex: number, step: 1 | -1) => {
     state.stepMandal(stringIndex, step);
     const s = state.strings[stringIndex];
@@ -210,7 +277,7 @@ export function QanunInstrument({
   const renderOrder = state.strings.slice().reverse();
 
   return (
-    <div className="qanun-instrument" role="group" aria-label={`Qanun strings — ${maqam.name.canonical}`}>
+    <div ref={rootRef} className="qanun-instrument" role="group" aria-label={`Qanun strings — ${maqam.name.canonical}`}>
       {renderOrder.map((s) => {
         const isKarar = s.rowDegree === 1;
         return (
@@ -225,8 +292,6 @@ export function QanunInstrument({
             isSustaining={sustainingIndices.has(s.index)}
             isPinned={pinnedIndices.has(s.index)}
             onStep={(step) => previewMandalStep(s.index, step)}
-            onPress={() => pressString(s.index)}
-            onRelease={() => releaseString(s.index)}
           />
         );
       })}
