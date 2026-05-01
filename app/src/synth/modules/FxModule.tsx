@@ -14,7 +14,6 @@ interface Props {
   bus: MasterBus;
 }
 
-const FX_LIST: FxKey[] = ['filter', 'overdrive', 'reverb', 'delay'];
 const FX_LABELS: Record<FxKey, string> = {
   filter: 'flt', overdrive: 'od', reverb: 'rev', delay: 'dly',
 };
@@ -78,10 +77,15 @@ function FxRow({ fx, module, bus }: { fx: FxKey; module: ControllableModule; bus
 export function FxModule({ bus }: Props) {
   return (
     <ConsoleModule title="MASTER FX">
-      <div className="fx-stack">
-        {FX_LIST.map((fx) => (
-          <FxRow key={fx} fx={fx} module={bus.effects[fx]} bus={bus} />
-        ))}
+      <div className="fx-grid">
+        <div className="fx-grid__col">
+          <FxRow fx="filter" module={bus.effects.filter} bus={bus} />
+          <FxRow fx="overdrive" module={bus.effects.overdrive} bus={bus} />
+        </div>
+        <div className="fx-grid__col">
+          <FxRow fx="reverb" module={bus.effects.reverb} bus={bus} />
+          <FxRow fx="delay" module={bus.effects.delay} bus={bus} />
+        </div>
       </div>
     </ConsoleModule>
   );
