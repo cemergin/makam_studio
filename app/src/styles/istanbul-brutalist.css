@@ -1128,6 +1128,15 @@ input[type='range'] {
   gap: 6px 8px;
   align-items: flex-end;
 }
+.console-module__sub-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(247, 240, 220, 0.5);
+  align-self: flex-end;
+  padding-bottom: 14px;
+  width: 24px;
+}
 .console-module__arrow {
   position: absolute;
   right: -8px; top: 50%;
