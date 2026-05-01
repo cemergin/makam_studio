@@ -9,13 +9,16 @@ import type { FilterConfig, FilterEnv, FilterType } from '../../audio/machines';
 interface Props {
   filter: FilterConfig;
   filterEnv: FilterEnv;
+  modulatedCutoff?: boolean;
   onFilter: (f: FilterConfig) => void;
   onFilterEnv: (e: FilterEnv) => void;
 }
 
 const FILTER_TYPES: FilterType[] = ['lp', 'hp', 'bp'];
 
-export function FilterModule({ filter, filterEnv, onFilter, onFilterEnv }: Props) {
+export function FilterModule({
+  filter, filterEnv, modulatedCutoff = false, onFilter, onFilterEnv,
+}: Props) {
   return (
     <ConsoleModule title="FILTER">
       <label className="osc-module__select">
@@ -32,6 +35,7 @@ export function FilterModule({ filter, filterEnv, onFilter, onFilterEnv }: Props
         value={filter.cutoff} min={50} max={18000} log
         defaultValue={6000}
         format={(v) => `${Math.round(v)}Hz`}
+        modulated={modulatedCutoff}
         onChange={(v) => onFilter({ ...filter, cutoff: v })}
       />
       <Knob

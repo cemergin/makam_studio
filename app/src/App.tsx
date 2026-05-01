@@ -132,6 +132,12 @@ export function App() {
   const level = useAnalyserLevel(bus.analyser);
   const machineLabel = MACHINES.find((m) => m.id === machineId)?.label ?? machineId;
 
+  // Derive whether a destination is being actively modulated, so the
+  // corresponding knob in the console pulses (Phase 6.2).
+  const isModulated = (dest: 'pitch' | 'filter' | 'amp') =>
+    (cfg.lfo1.depth > 0 && cfg.lfo1.destination === dest) ||
+    (cfg.lfo2.depth > 0 && cfg.lfo2.destination === dest);
+
   return (
     <div className="app app--top-console">
       <header className="app-header">
@@ -158,6 +164,7 @@ export function App() {
           brightness={cfg.brightness}
           body={cfg.body}
           machineParams={cfg.params}
+          modulatedPitch={isModulated('pitch')}
           onMachineId={setMachineId}
           onOctave={(octave) => updateCfg({ octave })}
           onBrightness={(brightness) => updateCfg({ brightness })}
@@ -167,10 +174,15 @@ export function App() {
         <FilterModule
           filter={cfg.filter}
           filterEnv={cfg.filterEnv}
+          modulatedCutoff={isModulated('filter')}
           onFilter={(filter) => updateCfg({ filter })}
           onFilterEnv={(filterEnv) => updateCfg({ filterEnv })}
         />
-        <AmpModule adsr={cfg.ampAdsr} onAdsr={(ampAdsr) => updateCfg({ ampAdsr })} />
+        <AmpModule
+          adsr={cfg.ampAdsr}
+          modulatedAmp={isModulated('amp')}
+          onAdsr={(ampAdsr) => updateCfg({ ampAdsr })}
+        />
         <ModModule
           lfo1={cfg.lfo1}
           lfo2={cfg.lfo2}

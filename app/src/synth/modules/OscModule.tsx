@@ -17,6 +17,7 @@ interface Props {
   brightness: number;
   body: number;
   machineParams: MachineParamValues;
+  modulatedPitch?: boolean;
   onMachineId: (id: MachineId) => void;
   onOctave: (v: number) => void;
   onBrightness: (v: number) => void;
@@ -26,6 +27,7 @@ interface Props {
 
 export function OscModule({
   machineId, octave, brightness, body, machineParams,
+  modulatedPitch = false,
   onMachineId, onOctave, onBrightness, onBody, onMachineParam,
 }: Props) {
   const renderMachineParam = (p: ParamSpec) => {
@@ -71,7 +73,7 @@ export function OscModule({
           {MACHINES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
         </select>
       </label>
-      <Knob label="octave"     value={octave}     min={-2} max={2} step={1} defaultValue={0}   onChange={onOctave}     />
+      <Knob label="octave"     value={octave}     min={-2} max={2} step={1} defaultValue={0}   onChange={onOctave}     modulated={modulatedPitch} />
       <Knob label="brightness" value={brightness} min={0}  max={1}        defaultValue={0.6} onChange={onBrightness} />
       <Knob label="body"       value={body}       min={0}  max={1}        defaultValue={0.3} onChange={onBody}       />
       {MACHINE_PARAMS[machineId].map(renderMachineParam)}
