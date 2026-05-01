@@ -26,11 +26,13 @@ interface Props {
   kararSemitoneOffset?: number;
   /** Number keys 1..9 select a maqam by its index in the rail. */
   onMaqamSelect?: (index: number) => void;
+  /** Drone octave offset (-2..+2). Multiplies drone pitch by 2^n. */
+  droneOctave?: number;
 }
 
 export function QanunInstrument({
   maqam, audioContext, destination, voiceId, brightness, body,
-  adsr, kararSemitoneOffset = 0, onMaqamSelect,
+  adsr, kararSemitoneOffset = 0, onMaqamSelect, droneOctave = 0,
 }: Props) {
   const state = useQanunState(maqam);
   const kararHz = defaultKararHz(maqam) * Math.pow(2, kararSemitoneOffset / 12);
@@ -84,6 +86,7 @@ export function QanunInstrument({
     onPinnedChange: setPinnedIndices,
     lastPluckedRef,
     onSelectMaqam: onMaqamSelect,
+    droneOctave,
   });
 
   const pluckString = (stringIndex: number) => {

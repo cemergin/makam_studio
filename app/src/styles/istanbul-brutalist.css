@@ -898,3 +898,14 @@ input[type='range'] {
 
 /* Number-row maqam selector (KeyboardOverlay) ---------------------- */
 .kbo__key--number { background: #2a3a3a; min-width: 22px; }
+
+/* Drone octave selector ------------------------------------------- */
+.drone-octave { display: flex; align-items: center; gap: 4px; margin: 6px 0 12px; }
+.drone-octave__btn {
+  background: var(--bg-2); color: var(--cream);
+  border: 1.5px solid #0a1316; border-radius: 2px;
+  padding: 4px 10px; font: 600 12px/1 var(--sans);
+  cursor: pointer; min-width: 32px;
+}
+.drone-octave__btn:hover { background: var(--tile-turquoise); color: #0a1316; }
+.drone-octave__btn--active { background: var(--saffron); color: #0a1316; box-shadow: 0 2px 0 rgba(0,0,0,0.7); }

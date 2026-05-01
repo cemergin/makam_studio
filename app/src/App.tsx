@@ -69,6 +69,9 @@ export function App() {
   // sustain, ~0.5s release. Held keys sustain at S until released.
   const [adsr, setAdsr] = useState<ADSR>({ a: 0.005, d: 0.4, s: 0.5, r: 0.5 });
 
+  // Space-hold drone octave offset. -2..+2 octaves from the held pitch.
+  const [droneOctave, setDroneOctave] = useState(0);
+
   // Karar transpose in semitones from the maqam's preset karar.
   // 0 = preset karar; positive = up. The 12 chromatic buttons map to
   // absolute note positions; we convert to a semitone offset relative
@@ -168,6 +171,7 @@ export function App() {
             const next = maqamat[idx];
             if (next) setMaqam(next);
           }}
+          droneOctave={droneOctave}
         />
       </main>
       <KeyboardOverlay />
@@ -196,11 +200,13 @@ export function App() {
             body={body}
             masterVolume={masterVolume}
             adsr={adsr}
+            droneOctave={droneOctave}
             onVoiceId={setVoiceId}
             onBrightness={setBrightness}
             onBody={setBody}
             onMasterVolume={setMasterVolume}
             onAdsr={setAdsr}
+            onDroneOctave={setDroneOctave}
           />
           <FxControls bus={bus} />
         </aside>

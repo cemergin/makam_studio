@@ -10,11 +10,13 @@ interface Props {
   body: number;
   masterVolume: number;
   adsr: ADSR;
+  droneOctave: number;
   onVoiceId: (v: VoiceId) => void;
   onBrightness: (v: number) => void;
   onBody: (v: number) => void;
   onMasterVolume: (v: number) => void;
   onAdsr: (v: ADSR) => void;
+  onDroneOctave: (n: number) => void;
 }
 
 function Slider({
@@ -88,8 +90,8 @@ function AdsrCurve({ adsr }: { adsr: ADSR }) {
 }
 
 export function SynthControls({
-  voiceId, brightness, body, masterVolume, adsr,
-  onVoiceId, onBrightness, onBody, onMasterVolume, onAdsr,
+  voiceId, brightness, body, masterVolume, adsr, droneOctave,
+  onVoiceId, onBrightness, onBody, onMasterVolume, onAdsr, onDroneOctave,
 }: Props) {
   const setA = (a: number) => onAdsr({ ...adsr, a });
   const setD = (d: number) => onAdsr({ ...adsr, d });
@@ -168,6 +170,22 @@ export function SynthControls({
         value={masterVolume}
         onChange={onMasterVolume}
       />
+
+      <h3 className="card__title">Drone</h3>
+      <div className="drone-octave" role="group" aria-label="Drone octave offset">
+        <span className="synth-slider__label">octave</span>
+        {[-2, -1, 0, 1, 2].map((n) => (
+          <button
+            key={n}
+            type="button"
+            className={`drone-octave__btn ${droneOctave === n ? 'drone-octave__btn--active' : ''}`}
+            onClick={() => onDroneOctave(n)}
+            aria-pressed={droneOctave === n}
+          >
+            {n > 0 ? `+${n}` : n === 0 ? '0' : `${n}`}
+          </button>
+        ))}
+      </div>
     </section>
   );
 }

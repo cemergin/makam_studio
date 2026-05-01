@@ -60,6 +60,8 @@ interface UseKeyboardInputArgs {
   lastPluckedRef?: { current: number | null };
   /** Called when a number key (1–9) selects a maqam by index. */
   onSelectMaqam?: (index: number) => void;
+  /** Octave offset for the Space-hold drone. Multiplies drone freq by 2^n. */
+  droneOctave?: number;
 }
 
 interface HeldNote {
@@ -422,7 +424,6 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
     const startDrone = () => {
       if (droneRef.current) return;
       const a = argsRef.current;
-      // Find a held note's pitch first; fall back to last-active string.
       let hz: number | null = null;
       heldNotesRef.current.forEach((note) => { if (hz == null) hz = note.currentHz; });
       if (hz == null && activeStringRef.current != null) {
@@ -430,6 +431,10 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         hz = centsToHz(a.kararHz, cents);
       }
       if (hz == null) return;
+      // Octave shift: multiply pitch by 2^n where n is the user's
+      // selected drone octave offset (-2..+2). Default 0 = no shift.
+      const oct = a.droneOctave ?? 0;
+      hz = hz * Math.pow(2, oct);
       droneRef.current = startSustainedDrone({
         audioContext: a.audioContext,
         destination: a.destination,
