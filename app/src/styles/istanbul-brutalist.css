@@ -1223,6 +1223,15 @@ input[type='range'] {
   align-items: stretch;
   min-height: 132px;
   padding: 6px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.console__rack::-webkit-scrollbar { height: 6px; }
+.console__rack::-webkit-scrollbar-track { background: transparent; }
+.console__rack::-webkit-scrollbar-thumb {
+  background: rgba(247, 240, 220, 0.15);
+  border-radius: 3px;
 }
 
 /* OscModule */
