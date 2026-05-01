@@ -16,7 +16,7 @@
   --karar: #d94c3d;          /* pomegranate red karar row */
   --cream: #f4f0e6;          /* cast-concrete signage */
   --teal-active: #1d6f7a;
-  --saffron: #e8d56a;
+  --saffron: #f4a52a;
   --text-shadow: 0 3px 0 rgba(0, 0, 0, 0.85);
   --line: #5a6266;
   --muted: #6a7378;
@@ -32,6 +32,12 @@
   --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --serif: 'Spectral', Georgia, serif;
   --arabic: 'IBM Plex Sans Arabic', 'Noto Naskh Arabic', serif;
+
+  /* Console palette tokens (Phase 6.1) ------------------------------- */
+  --console-panel:    #1a1614;
+  --console-panel-2:  #14110f;
+  --console-card:     rgba(247, 240, 220, 0.03);
+  --silk-screen:      rgba(247, 240, 220, 0.7);
 }
 
 * { box-sizing: border-box; }
@@ -1034,6 +1040,19 @@ input[type='range'] {
   outline: none;
   transition: border-color 0.1s ease, box-shadow 0.1s ease;
 }
+.knob__face::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background:
+    radial-gradient(2px 2px at 50% 0%, var(--silk-screen) 100%, transparent 100%) no-repeat,
+    radial-gradient(2px 2px at 100% 50%, var(--silk-screen) 100%, transparent 100%) no-repeat,
+    radial-gradient(2px 2px at 50% 100%, var(--silk-screen) 100%, transparent 100%) no-repeat,
+    radial-gradient(2px 2px at 0% 50%, var(--silk-screen) 100%, transparent 100%) no-repeat;
+  opacity: 0.3;
+  pointer-events: none;
+}
 .knob__face:focus-visible,
 .knob__face--dragging {
   border-color: var(--saffron, #f4a52a);
@@ -1088,12 +1107,12 @@ input[type='range'] {
 }
 .console-module__arrow {
   position: absolute;
-  right: -7px; top: 50%;
+  right: -8px; top: 50%;
   transform: translateY(-50%);
-  font-size: 14px;
-  color: var(--saffron, #f4a52a);
-  opacity: 0.5;
-  pointer-events: none;
+  font-size: 12px;
+  color: var(--saffron);
+  opacity: 0.6;
+  text-shadow: 0 0 4px rgba(244, 165, 42, 0.4);
 }
 
 /* Meter */
