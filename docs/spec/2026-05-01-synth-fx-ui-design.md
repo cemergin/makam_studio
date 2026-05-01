@@ -190,6 +190,8 @@ voice → bus boundary.
 - octave knob (-2..+2)
 - brightness knob
 - body knob
+- voice-mode selector (`poly` / `legato`)
+- glide knob (5..300 ms; only meaningful in legato mode)
 - machine-specific knobs auto-rendered from `machine.params`
 
 ### FILTER
@@ -223,6 +225,52 @@ voice → bus boundary.
 - master volume knob
 - output meter (large)
 - audio-context resume button (when ctx is suspended)
+
+## Legato voice mode
+
+A keyboard-only voice mode toggle on the OSC module: **poly** (current
+behavior — every key press creates a new voice) or **legato** (mono
+voice + portamento glide).
+
+### Legato semantics (model A — pure legato, no retrigger)
+
+- **One voice at a time.** Keys press onto a stack (most-recent on
+  top). The voice always sounds the topmost held key.
+- **First key press in a held-group**: trigger fresh voice through
+  `triggerMachineSustained`, full attack envelope, normal sustain.
+- **Subsequent key presses while voice is sounding**: glide voice to
+  the new pitch via `handle.setFrequency(hz, glideMs)`. **No envelope
+  retrigger** — the amp envelope continues from sustain, no new
+  attack. The string-index follows the topmost key.
+- **Key release while others are still held**: pop from stack. If
+  stack non-empty, glide voice to the new top. If stack empty, call
+  `handle.release()` (ADSR R rings out as today).
+- **`glideMs` knob** controls portamento time. Default 60 ms. Range
+  5–300 ms.
+
+### Mouse strum stays poly-style regardless of voiceMode
+
+The drag-strum gesture (Phase 5) deliberately decouples each pointer-
+over event into a discrete sustain. Legato is keyboard-only in v1 to
+keep the gesture metaphors distinct (mizrap strum vs sliding melody).
+A future revision may unify them.
+
+### Modifier compatibility
+
+- Carpma slides (held + modifier) operate on the active voice in both
+  modes — in legato, that's just the one mono voice.
+- Persistent-state mode-shift (no-held + modifier) operates on the
+  last-plucked string regardless of voiceMode.
+- J (canonical reset) works the same in both modes.
+
+### Implementation
+
+- New ref `monoVoiceRef: { handle, stringIndex, baseHz, currentHz,
+  baseMandalIdx, currentMandalIdx } | null`
+- New ref `monoStackRef: { code, stringIndex }[]`
+- `startScaleNote` and `releaseScaleNote` branch on `voiceMode`
+- Modifier slide / flip helpers operate on `heldNotesRef` (poly) OR
+  `monoVoiceRef` (legato) — abstract behind a single iterator helper
 
 ## Visual style
 

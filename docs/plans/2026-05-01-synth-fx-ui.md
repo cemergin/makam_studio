@@ -2771,6 +2771,361 @@ The GitHub Pages deploy workflow at `.github/workflows/deploy.yml` will publish 
 
 ---
 
+---
+
+## Phase 7 — Legato voice mode
+
+### Task 7.1: Add `voiceMode` + `glideMs` to MachineConfig + OSC module UI
+
+**Why:** Surface the toggle and the portamento time knob so users can switch from poly to legato mode and tune the glide.
+
+**Files:**
+- Modify: `app/src/App.tsx`
+- Modify: `app/src/synth/modules/OscModule.tsx`
+
+- [ ] **Step 1: Extend `MachineConfig` and per-machine defaults**
+
+In `App.tsx`, add to `MachineConfig`:
+
+```ts
+interface MachineConfig {
+  // ...existing fields
+  voiceMode: 'poly' | 'legato';
+  glideMs: number;       // portamento time in legato mode (5..300)
+}
+```
+
+In `machineDefaults(id)`, add to the `universal` map for every machine:
+
+```ts
+voiceMode: 'poly' as const,
+glideMs: 60,
+```
+
+- [ ] **Step 2: Pass `voiceMode` + `glideMs` to OscModule**
+
+In `App.tsx`, update the OSC module invocation:
+
+```tsx
+<OscModule
+  // ...existing props
+  voiceMode={cfg.voiceMode}
+  glideMs={cfg.glideMs}
+  onVoiceMode={(voiceMode) => updateCfg({ voiceMode })}
+  onGlideMs={(glideMs) => updateCfg({ glideMs })}
+/>
+```
+
+- [ ] **Step 3: Render the selector + knob in `OscModule`**
+
+In `OscModule.tsx`, add to `Props`:
+
+```ts
+voiceMode: 'poly' | 'legato';
+glideMs: number;
+onVoiceMode: (m: 'poly' | 'legato') => void;
+onGlideMs: (ms: number) => void;
+```
+
+In the JSX, after the body knob and before the machine-specific knobs, add:
+
+```tsx
+<label className="osc-module__select">
+  <span>voice</span>
+  <select
+    value={voiceMode}
+    onChange={(e) => onVoiceMode(e.target.value as 'poly' | 'legato')}
+  >
+    <option value="poly">poly</option>
+    <option value="legato">legato</option>
+  </select>
+</label>
+<Knob
+  label="glide"
+  unit="ms"
+  value={glideMs}
+  min={5}
+  max={300}
+  log
+  defaultValue={60}
+  format={(v) => `${Math.round(v)}ms`}
+  onChange={onGlideMs}
+/>
+```
+
+- [ ] **Step 4: Thread `voiceMode` + `glideMs` to QanunInstrument and the keyboard hook**
+
+In `App.tsx`, pass into `QanunInstrument`:
+
+```tsx
+voiceMode={cfg.voiceMode}
+glideMs={cfg.glideMs}
+```
+
+In `QanunInstrument.tsx`, add to `Props` (both optional with defaults):
+
+```ts
+voiceMode?: 'poly' | 'legato';
+glideMs?: number;
+```
+
+Thread into `useKeyboardInput({ voiceMode, glideMs, ... })`. (Task 7.2 implements the consuming logic.)
+
+- [ ] **Step 5: Add a placeholder `voiceMode` arg to `UseKeyboardInputArgs`**
+
+In `app/src/keyboard/use-keyboard-input.ts`, add to `UseKeyboardInputArgs`:
+
+```ts
+voiceMode?: 'poly' | 'legato';
+glideMs?: number;
+```
+
+Don't change behavior yet — Task 7.2 wires the legato code path. Default `voiceMode = 'poly'` keeps everything working.
+
+- [ ] **Step 6: Build + smoke**
+
+Run: `cd app && bun run build && bun run dev`
+
+Expected: `voice` selector appears in OSC module, `glide` knob next to it. Switching voice/glide doesn't change behavior yet (legato logic lands in 7.2 — confirms wiring only).
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add app/src/App.tsx \
+        app/src/synth/modules/OscModule.tsx \
+        app/src/qanun/QanunInstrument.tsx \
+        app/src/keyboard/use-keyboard-input.ts
+git commit -m "Legato wiring: voiceMode + glideMs through MachineConfig and keyboard hook (no logic yet)"
+```
+
+---
+
+### Task 7.2: Implement legato voice management in keyboard hook
+
+**Why:** With wiring in place, add the actual mono-voice + key-stack logic. Switching `voiceMode` to `legato` should cause one voice at a time, gliding between keys without envelope retrigger.
+
+**Files:**
+- Modify: `app/src/keyboard/use-keyboard-input.ts`
+
+- [ ] **Step 1: Add mono-voice + key-stack refs**
+
+Near the other refs in `useKeyboardInput`, add:
+
+```ts
+interface MonoVoiceState {
+  handle: MachineHandle;
+  stringIndex: number;
+  baseHz: number;
+  currentHz: number;
+  baseMandalIdx: number;
+  currentMandalIdx: number;
+}
+const monoVoiceRef = useRef<MonoVoiceState | null>(null);
+const monoStackRef = useRef<{ code: string; stringIndex: number }[]>([]);
+```
+
+- [ ] **Step 2: Branch `startScaleNote` on `voiceMode`**
+
+In `startScaleNote(code, stringIndex)`, after computing `baseCents` / `hz` / `baseMandalIdx`, check the mode:
+
+```ts
+const a = argsRef.current;
+const isLegato = a.voiceMode === 'legato';
+const glideMs = a.glideMs ?? 60;
+
+if (!isLegato) {
+  // existing poly path: triggerMachineSustained, register in heldNotesRef, etc.
+  return;
+}
+
+// legato path
+const stack = monoStackRef.current;
+// remove any prior entry for this code (key auto-repeat already filtered upstream)
+const existingIdx = stack.findIndex((e) => e.code === code);
+if (existingIdx >= 0) stack.splice(existingIdx, 1);
+stack.push({ code, stringIndex });
+
+if (!monoVoiceRef.current) {
+  // first key in a held-group → trigger fresh voice
+  const handle = triggerMachineSustained(a.machineId, {
+    audioContext: a.audioContext,
+    destination: a.destination,
+    frequencyHz: hz,
+    velocity: 0.85,
+    brightness: a.brightness, body: a.body,
+    adsr: a.adsr, filter: a.filter, filterEnv: a.filterEnv,
+    lfo1: a.lfo1, lfo2: a.lfo2,
+    octaveOffset: a.octaveOffset, params: a.machineParams,
+  });
+  monoVoiceRef.current = {
+    handle, stringIndex,
+    baseHz: hz, currentHz: hz,
+    baseMandalIdx, currentMandalIdx: baseMandalIdx,
+  };
+} else {
+  // subsequent key → glide existing voice to new pitch (no retrigger)
+  monoVoiceRef.current.handle.setFrequency(hz, glideMs);
+  monoVoiceRef.current.stringIndex = stringIndex;
+  monoVoiceRef.current.currentHz = hz;
+  monoVoiceRef.current.baseMandalIdx = baseMandalIdx;
+  monoVoiceRef.current.currentMandalIdx = baseMandalIdx;
+}
+activeStringRef.current = stringIndex;
+a.onPluck?.(stringIndex);
+emitSustainingChange();
+```
+
+- [ ] **Step 3: Branch `releaseScaleNote` on `voiceMode`**
+
+In `releaseScaleNote(code)`:
+
+```ts
+const a = argsRef.current;
+const isLegato = a.voiceMode === 'legato';
+if (!isLegato) {
+  // existing poly path
+  return;
+}
+const stack = monoStackRef.current;
+const idx = stack.findIndex((e) => e.code === code);
+if (idx < 0) return;
+stack.splice(idx, 1);
+
+if (stack.length === 0) {
+  monoVoiceRef.current?.handle.release();
+  monoVoiceRef.current = null;
+  emitSustainingChange();
+  return;
+}
+// glide to new stack top
+const top = stack[stack.length - 1];
+const v = monoVoiceRef.current;
+if (!v) return;
+const baseCents = baseSoundingCents(top.stringIndex);
+const newHz = centsToHz(a.kararHz, baseCents);
+v.handle.setFrequency(newHz, a.glideMs ?? 60);
+v.stringIndex = top.stringIndex;
+v.currentHz = newHz;
+const s = a.state.strings[top.stringIndex];
+const row = s ? a.maqam.rows.find((r) => r.degree === s.rowDegree) : null;
+const legal = row?.legal_positions ?? [];
+v.baseMandalIdx = legal.length > 0 && s
+  ? nearestMandalPosition(s.currentCentsMid, legal).index
+  : 0;
+v.currentMandalIdx = v.baseMandalIdx;
+activeStringRef.current = top.stringIndex;
+emitSustainingChange();
+```
+
+- [ ] **Step 4: Update `emitSustainingChange` to include the mono voice**
+
+Modify `emitSustainingChange` so legato mode reports the mono voice's stringIndex into the sustaining set:
+
+```ts
+const emitSustainingChange = () => {
+  const a = argsRef.current;
+  if (!a.onSustainingChange) return;
+  const set = new Set<number>();
+  // poly voices
+  for (const note of heldNotesRef.current.values()) set.add(note.stringIndex);
+  // legato voice
+  if (monoVoiceRef.current) set.add(monoVoiceRef.current.stringIndex);
+  a.onSustainingChange(set);
+};
+```
+
+- [ ] **Step 5: Update modifier helpers to operate on the mono voice too**
+
+`slideHeldNotesBy(delta, glideMs)` and `slideHeldNotesToBase(glideMs)` currently iterate `heldNotesRef`. Add a parallel branch for the mono voice:
+
+```ts
+const slideHeldNotesBy = (delta: number, glideMs = 30) => {
+  const a = argsRef.current;
+  // existing iteration over heldNotesRef.current.forEach(...)
+  // ...
+
+  // mono voice path
+  const v = monoVoiceRef.current;
+  if (v) {
+    const s = a.state.strings[v.stringIndex];
+    if (!s) return;
+    const row = a.maqam.rows.find((r) => r.degree === s.rowDegree);
+    if (!row) return;
+    const legal = row.legal_positions;
+    if (legal.length === 0) return;
+
+    let targetIdx: number;
+    if (delta === 0) {
+      const canonicalIdx = legal.findIndex((p) => p.is_canonical);
+      targetIdx = canonicalIdx >= 0 ? canonicalIdx : v.baseMandalIdx;
+      pinnedMandalRef.current.delete(v.stringIndex);
+      v.baseMandalIdx = targetIdx;
+    } else {
+      const dir = (delta > 0 ? 1 : -1) as 1 | -1;
+      targetIdx = v.baseMandalIdx;
+      for (let i = 0; i < Math.abs(delta); i++) {
+        targetIdx = stepMandalIndex(targetIdx, dir, legal);
+      }
+    }
+    const diff = targetIdx - v.currentMandalIdx;
+    if (diff !== 0) {
+      const stepDir = (diff > 0 ? 1 : -1) as 1 | -1;
+      for (let i = 0; i < Math.abs(diff); i++) {
+        a.state.stepMandal(v.stringIndex, stepDir);
+      }
+    }
+    v.currentMandalIdx = targetIdx;
+    const targetCents = soundingCentsAt(v.stringIndex, targetIdx);
+    const targetHz = centsToHz(a.kararHz, targetCents);
+    v.currentHz = targetHz;
+    v.handle.setFrequency(targetHz, glideMs);
+  }
+};
+```
+
+Apply the equivalent mono-voice block to `slideHeldNotesToBase`.
+
+- [ ] **Step 6: Update onBlur / cleanup paths**
+
+In the cleanup / blur handlers, also release the mono voice:
+
+```ts
+const releaseAllNotes = () => {
+  // existing heldNotesRef cleanup
+  monoVoiceRef.current?.handle.release();
+  monoVoiceRef.current = null;
+  monoStackRef.current = [];
+  emitSustainingChange();
+};
+```
+
+- [ ] **Step 7: Build + smoke test**
+
+Run: `cd app && bun run build && bun run dev`
+
+In browser:
+1. Default mode is poly — multiple keys = chord (current behavior).
+2. Switch OSC → voice → legato. Glide = 60.
+3. Press A — sustains.
+4. Press S while still holding A — pitch glides to S, no fresh attack.
+5. Release S, A still held — pitch glides back to A.
+6. Release A — voice releases (ADSR R).
+7. Press D, then F, then G in quick succession — each glide happens with no retrigger.
+8. With H held in legato, modifier slides: hold A, then press M (carpma down) → voice slides down; release M → slides back. Same as poly.
+9. With no notes held in legato, press H (no-held + modifier = persistent flip) → string state shifts, no audio. Then press A → sounds at modified pitch. Same as poly.
+10. Switch back to poly mid-play — releases all monos, then poly triggers per-key as today.
+
+Stop dev server.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add app/src/keyboard/use-keyboard-input.ts
+git commit -m "Legato voice mode: mono voice + key stack, no envelope retrigger"
+```
+
+---
+
 ## Risks + mitigations
 
 - **Phase 1 master-bus rewire is the highest-risk change.** The limiter at the tail is the safety net; smoke testing with the current UI before any layout disruption catches problems early. The test in Task 1.4 explicitly verifies "reverb + delay both fully wet doesn't run away."
