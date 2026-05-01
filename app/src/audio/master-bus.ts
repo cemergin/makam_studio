@@ -70,6 +70,9 @@ export function createMasterBus(ctx: AudioContext): MasterBus {
   const masterMix    = ctx.createGain();   masterMix.gain.value = 1;
   const masterVolume = ctx.createGain();   masterVolume.gain.value = 0.6;
 
+  // Brick-wall safety limiter at the bus tail. Threshold -3 dBFS so
+  // accumulating polyphony + maxed-out reverb/delay tails can't escape
+  // louder than -3 dBFS regardless of voice amplitude.
   const limiter = ctx.createDynamicsCompressor();
   limiter.threshold.value = -3;
   limiter.ratio.value     = 20;
@@ -111,8 +114,14 @@ export function createMasterBus(ctx: AudioContext): MasterBus {
     reverb:    'wet',
     delay:     'wet',
   };
-  const lastValue: Record<FxKey, number> = {
-    filter: 0, overdrive: 0, reverb: 0, delay: 0,
+  // Last user-set value for each FX's bypass param. Hint cache, NOT
+  // authoritative — FxControls owns the source of truth for slider
+  // values. Used to round-trip a user's mix/wet through bypass so
+  // toggling on/off doesn't lose their setting. `undefined` means
+  // "user has never touched it"; un-bypass falls back to 0.5 (a
+  // sensible audible default) in that case.
+  const lastValue: Record<FxKey, number | undefined> = {
+    filter: undefined, overdrive: undefined, reverb: undefined, delay: undefined,
   };
   const bypassed: Record<FxKey, boolean> = {
     filter: true, overdrive: true, reverb: true, delay: true,
@@ -133,18 +142,23 @@ export function createMasterBus(ctx: AudioContext): MasterBus {
     setFxBypass(fx, bypass) {
       bypassed[fx] = bypass;
       if (bypass) {
-        // Snapshot current bypass-param value, then ramp to 0.
-        // (Modules expose their current via .get() in some forks; we
-        // remember it via setFxParam interception above.)
         effects[fx]?.set(BYPASS_PARAM[fx], 0);
       } else {
-        effects[fx]?.set(BYPASS_PARAM[fx], lastValue[fx] || 0.5);
+        // Distinguish "never set" (undefined → fall back to 0.5) from
+        // "explicitly zero" (round-trip 0). The previous `|| 0.5`
+        // collapsed both into 0.5 and surprised users who had
+        // manually zeroed the slider.
+        const restored = lastValue[fx] !== undefined ? lastValue[fx]! : 0.5;
+        effects[fx]?.set(BYPASS_PARAM[fx], restored);
       }
     },
     setMasterVolume(v) {
       masterVolume.gain.value = Math.max(0, Math.min(1, v));
     },
     dispose() {
+      // FX modules own the disconnection of their internal nodes
+      // (including the output gains feeding masterMix) — see each
+      // module's dispose() in app/src/_core/audio/effects/.
       for (const n of [input, masterMix, masterVolume, limiter, analyser]) {
         try { n.disconnect(); } catch { /* idempotent */ }
       }
