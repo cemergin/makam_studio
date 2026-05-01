@@ -1208,3 +1208,15 @@ input[type='range'] {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(247, 240, 220, 0.1);
 }
+
+/* ModModule */
+.mod-module { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.mod-module__row { display: flex; align-items: flex-start; gap: 10px; }
+.mod-module__row-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(247, 240, 220, 0.7);
+  align-self: center;
+  width: 36px;
+}
