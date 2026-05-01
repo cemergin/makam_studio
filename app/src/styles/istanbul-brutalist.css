@@ -1419,3 +1419,38 @@ input[type='range'] {
   height: 3px;
   transition: background 200ms ease, height 200ms ease;
 }
+
+/* MasterModule */
+.master-module {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  min-width: 160px;
+}
+.master-module__meter {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.master-module__vol {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(247, 240, 220, 0.7);
+}
+.master-module__vol input[type='range'] {
+  flex: 1;
+  accent-color: var(--saffron, #f4a52a);
+}
+.master-module__vol-readout {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--saffron, #f4a52a);
+  width: 22px;
+  text-align: right;
+}

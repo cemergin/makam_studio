@@ -203,6 +203,8 @@ export function App() {
         <MasterModule
           level={level}
           audioState={audioState}
+          masterVolume={masterVolume}
+          onMasterVolume={setMasterVolume}
           onResume={() => resume()}
         />
       </Console>
