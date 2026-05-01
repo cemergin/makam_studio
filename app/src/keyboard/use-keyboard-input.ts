@@ -82,6 +82,10 @@ interface UseKeyboardInputArgs {
   octaveOffset?: number;
   /** Machine-specific params keyed by ParamSpec.name from MACHINE_PARAMS. */
   machineParams?: import('../audio/machines').MachineParamValues;
+  /** Voice mode: 'poly' (chord, default) or 'legato' (mono + glide). */
+  voiceMode?: 'poly' | 'legato';
+  /** Glide time in milliseconds for legato mode (default 60). */
+  glideMs?: number;
   maqam: MaqamPreset;
   kararHz: number;
   state: QanunState;

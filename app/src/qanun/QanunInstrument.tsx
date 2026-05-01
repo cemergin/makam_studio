@@ -43,6 +43,10 @@ interface Props {
   octaveOffset?: number;
   /** Machine-specific params keyed by ParamSpec.name from MACHINE_PARAMS. */
   machineParams?: MachineParamValues;
+  /** Voice management mode (poly = chord; legato = mono w/ glide). */
+  voiceMode?: 'poly' | 'legato';
+  /** Glide time in milliseconds (legato mode). */
+  glideMs?: number;
   kararSemitoneOffset?: number;
   /** Number keys 1..9 select a maqam by its index in the rail. */
   onMaqamSelect?: (index: number) => void;
@@ -54,6 +58,7 @@ export function QanunInstrument({
   maqam, audioContext, destination, machineId, brightness, body,
   adsr, filter, filterEnv, lfo1, lfo2,
   octaveOffset = 0, machineParams,
+  voiceMode, glideMs,
   kararSemitoneOffset = 0, onMaqamSelect, droneOctave = 0,
 }: Props) {
   const state = useQanunState(maqam);
@@ -110,6 +115,8 @@ export function QanunInstrument({
     lfo2,
     octaveOffset,
     machineParams,
+    voiceMode,
+    glideMs,
     maqam,
     kararHz,
     state,

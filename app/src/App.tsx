@@ -50,6 +50,8 @@ interface MachineConfig {
   body: number;
   octave: number;
   params: MachineParamValues;
+  voiceMode: 'poly' | 'legato';
+  glideMs: number;
 }
 
 function machineDefaults(id: MachineId): MachineConfig {
@@ -64,6 +66,7 @@ function machineDefaults(id: MachineId): MachineConfig {
       lfo1:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
       lfo2:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
       brightness: 0.6, body: 0.3, octave: 0,
+      voiceMode: 'poly' as const, glideMs: 60,
     },
     'vapor-pluck': {
       ampAdsr:   { a: 0.005, d: 0.4, s: 0.5, r: 0.5 },
@@ -72,6 +75,7 @@ function machineDefaults(id: MachineId): MachineConfig {
       lfo1:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
       lfo2:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
       brightness: 0.6, body: 0.3, octave: 0,
+      voiceMode: 'poly' as const, glideMs: 60,
     },
     'synthwave-saw': {
       ampAdsr:   { a: 0.005, d: 0.4, s: 0.5, r: 0.5 },
@@ -80,6 +84,7 @@ function machineDefaults(id: MachineId): MachineConfig {
       lfo1:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
       lfo2:      { rate: 2, shape: 'sine', depth: 0, destination: 'off' },
       brightness: 0.6, body: 0.3, octave: 0,
+      voiceMode: 'poly' as const, glideMs: 60,
     },
     'dream-pad': {
       ampAdsr:   { a: 1.0, d: 1.0, s: 0.7, r: 1.0 },
@@ -88,6 +93,7 @@ function machineDefaults(id: MachineId): MachineConfig {
       lfo1:      { rate: 0.5, shape: 'sine', depth: 0, destination: 'off' },
       lfo2:      { rate: 0.3, shape: 'sine', depth: 0, destination: 'off' },
       brightness: 0.5, body: 0.3, octave: 0,
+      voiceMode: 'poly' as const, glideMs: 60,
     },
   };
   return { ...universal[id], params };
@@ -164,12 +170,16 @@ export function App() {
           brightness={cfg.brightness}
           body={cfg.body}
           machineParams={cfg.params}
+          voiceMode={cfg.voiceMode}
+          glideMs={cfg.glideMs}
           modulatedPitch={isModulated('pitch')}
           onMachineId={setMachineId}
           onOctave={(octave) => updateCfg({ octave })}
           onBrightness={(brightness) => updateCfg({ brightness })}
           onBody={(body) => updateCfg({ body })}
           onMachineParam={(name, value) => updateCfg({ params: { ...cfg.params, [name]: value } })}
+          onVoiceMode={(voiceMode) => updateCfg({ voiceMode })}
+          onGlideMs={(glideMs) => updateCfg({ glideMs })}
         />
         <FilterModule
           filter={cfg.filter}
@@ -236,6 +246,8 @@ export function App() {
           lfo2={cfg.lfo2}
           octaveOffset={cfg.octave}
           machineParams={cfg.params}
+          voiceMode={cfg.voiceMode}
+          glideMs={cfg.glideMs}
           kararSemitoneOffset={kararSemitoneOffset}
           onMaqamSelect={(idx) => { const next = maqamat[idx]; if (next) setMaqam(next); }}
           droneOctave={0}

@@ -17,18 +17,24 @@ interface Props {
   brightness: number;
   body: number;
   machineParams: MachineParamValues;
+  voiceMode: 'poly' | 'legato';
+  glideMs: number;
   modulatedPitch?: boolean;
   onMachineId: (id: MachineId) => void;
   onOctave: (v: number) => void;
   onBrightness: (v: number) => void;
   onBody: (v: number) => void;
   onMachineParam: (name: string, value: number | string) => void;
+  onVoiceMode: (m: 'poly' | 'legato') => void;
+  onGlideMs: (ms: number) => void;
 }
 
 export function OscModule({
   machineId, octave, brightness, body, machineParams,
+  voiceMode, glideMs,
   modulatedPitch = false,
   onMachineId, onOctave, onBrightness, onBody, onMachineParam,
+  onVoiceMode, onGlideMs,
 }: Props) {
   const renderMachineParam = (p: ParamSpec) => {
     if (p.kind === 'discrete' && p.options) {
@@ -76,6 +82,27 @@ export function OscModule({
       <Knob label="octave"     value={octave}     min={-2} max={2} step={1} defaultValue={0}   onChange={onOctave}     modulated={modulatedPitch} />
       <Knob label="brightness" value={brightness} min={0}  max={1}        defaultValue={0.6} onChange={onBrightness} />
       <Knob label="body"       value={body}       min={0}  max={1}        defaultValue={0.3} onChange={onBody}       />
+      <label className="osc-module__select">
+        <span>voice</span>
+        <select
+          value={voiceMode}
+          onChange={(e) => onVoiceMode(e.target.value as 'poly' | 'legato')}
+        >
+          <option value="poly">poly</option>
+          <option value="legato">legato</option>
+        </select>
+      </label>
+      <Knob
+        label="glide"
+        unit="ms"
+        value={glideMs}
+        min={5}
+        max={300}
+        log
+        defaultValue={60}
+        format={(v) => `${Math.round(v)}ms`}
+        onChange={onGlideMs}
+      />
       {MACHINE_PARAMS[machineId].map(renderMachineParam)}
     </ConsoleModule>
   );
