@@ -1182,3 +1182,22 @@ input[type='range'] {
   min-height: 196px;
   padding: 8px 0;
 }
+
+/* OscModule */
+.osc-module__select {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(247, 240, 220, 0.7);
+}
+.osc-module__select select {
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--saffron, #f4a52a);
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  border: 1px solid rgba(247, 240, 220, 0.2);
+  padding: 4px 6px;
+}
