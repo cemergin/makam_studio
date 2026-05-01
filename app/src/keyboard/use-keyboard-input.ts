@@ -118,12 +118,31 @@ interface HeldNote {
   currentMandalIdx: number;   // current mandal index (drives state visualization)
 }
 
+/** Legato (mono) voice state. Only one is active at a time; new key
+ *  presses glide this voice to the new pitch without retriggering the
+ *  envelope. The held-key stack is in `monoStackRef`. */
+interface MonoVoiceState {
+  handle: MachineHandle;
+  stringIndex: number;
+  baseHz: number;
+  currentHz: number;
+  baseMandalIdx: number;
+  currentMandalIdx: number;
+}
+
 export function useKeyboardInput(args: UseKeyboardInputArgs): void {
   const argsRef = useRef(args);
   argsRef.current = args;
 
   // Map<keyboard-code, HeldNote> — all currently sustaining keys.
   const heldNotesRef = useRef<Map<string, HeldNote>>(new Map());
+  // Legato (mono) voice + key-stack. Only used when voiceMode==='legato'.
+  // The stack is the order keys were pressed; the top of the stack is
+  // the currently-sounding pitch. Releasing a non-top key removes it
+  // from the stack without affecting audio; releasing the top glides
+  // the voice back to the new top.
+  const monoVoiceRef = useRef<MonoVoiceState | null>(null);
+  const monoStackRef = useRef<{ code: string; stringIndex: number }[]>([]);
   const droneRef = useRef<DroneHandle | null>(null);
   const transposeRef = useRef<number>(0);
   const heldKeysRef = useRef<Set<string>>(new Set());
@@ -164,8 +183,8 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
 
     const startScaleNote = (code: string, stringIndex: number) => {
       const a = argsRef.current;
-      const existing = heldNotesRef.current.get(code);
-      if (existing) existing.handle.release();
+      const isLegato = a.voiceMode === 'legato';
+      const glideMs = a.glideMs ?? 60;
 
       // Read the string's CURRENT state (including any persistent
       // modifications applied by previous modifier presses). The note
@@ -180,54 +199,143 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       const baseCents = baseSoundingCents(stringIndex);
       const hz = centsToHz(a.kararHz, baseCents);
 
-      const handle = triggerMachineSustained(a.machineId, {
-        audioContext: a.audioContext,
-        destination: a.destination,
-        frequencyHz: hz,
-        velocity: 0.85,
-        brightness: a.brightness,
-        body: a.body,
-        adsr: a.adsr,
-        filter: a.filter,
-        filterEnv: a.filterEnv,
-        lfo1: a.lfo1,
-        lfo2: a.lfo2,
-        octaveOffset: a.octaveOffset,
-        params: a.machineParams,
-      });
+      if (!isLegato) {
+        // POLY path — preserve existing behavior.
+        const existing = heldNotesRef.current.get(code);
+        if (existing) existing.handle.release();
 
-      heldNotesRef.current.set(code, {
-        handle,
-        stringIndex,
-        baseHz: hz,
-        currentHz: hz,
-        baseMandalIdx,
-        currentMandalIdx: baseMandalIdx,
-      });
+        const handle = triggerMachineSustained(a.machineId, {
+          audioContext: a.audioContext,
+          destination: a.destination,
+          frequencyHz: hz,
+          velocity: 0.85,
+          brightness: a.brightness,
+          body: a.body,
+          adsr: a.adsr,
+          filter: a.filter,
+          filterEnv: a.filterEnv,
+          lfo1: a.lfo1,
+          lfo2: a.lfo2,
+          octaveOffset: a.octaveOffset,
+          params: a.machineParams,
+        });
+
+        heldNotesRef.current.set(code, {
+          handle,
+          stringIndex,
+          baseHz: hz,
+          currentHz: hz,
+          baseMandalIdx,
+          currentMandalIdx: baseMandalIdx,
+        });
+        activeStringRef.current = stringIndex;
+        a.onPluck?.(stringIndex);
+        emitSustainingChange();
+        return;
+      }
+
+      // LEGATO path — single mono voice + key stack. New keys glide the
+      // existing voice without re-triggering the envelope.
+      const stack = monoStackRef.current;
+      const existingIdx = stack.findIndex((e) => e.code === code);
+      if (existingIdx >= 0) stack.splice(existingIdx, 1);
+      stack.push({ code, stringIndex });
+
+      if (!monoVoiceRef.current) {
+        const handle = triggerMachineSustained(a.machineId, {
+          audioContext: a.audioContext,
+          destination: a.destination,
+          frequencyHz: hz,
+          velocity: 0.85,
+          brightness: a.brightness,
+          body: a.body,
+          adsr: a.adsr,
+          filter: a.filter,
+          filterEnv: a.filterEnv,
+          lfo1: a.lfo1,
+          lfo2: a.lfo2,
+          octaveOffset: a.octaveOffset,
+          params: a.machineParams,
+        });
+        monoVoiceRef.current = {
+          handle,
+          stringIndex,
+          baseHz: hz,
+          currentHz: hz,
+          baseMandalIdx,
+          currentMandalIdx: baseMandalIdx,
+        };
+      } else {
+        monoVoiceRef.current.handle.setFrequency(hz, glideMs);
+        monoVoiceRef.current.stringIndex = stringIndex;
+        monoVoiceRef.current.currentHz = hz;
+        monoVoiceRef.current.baseMandalIdx = baseMandalIdx;
+        monoVoiceRef.current.currentMandalIdx = baseMandalIdx;
+      }
       activeStringRef.current = stringIndex;
       a.onPluck?.(stringIndex);
       emitSustainingChange();
     };
 
     const releaseScaleNote = (code: string) => {
-      const note = heldNotesRef.current.get(code);
-      if (!note) return;
-      // PERSISTENT model: no auto-revert on release. The string stays
-      // wherever it currently is. Use J to explicitly reset to canonical.
-      note.handle.release();
-      heldNotesRef.current.delete(code);
+      const a = argsRef.current;
+      const isLegato = a.voiceMode === 'legato';
+
+      if (!isLegato) {
+        // POLY path — preserve existing behavior.
+        const note = heldNotesRef.current.get(code);
+        if (!note) return;
+        // PERSISTENT model: no auto-revert on release. The string stays
+        // wherever it currently is. Use J to explicitly reset to canonical.
+        note.handle.release();
+        heldNotesRef.current.delete(code);
+        emitSustainingChange();
+        return;
+      }
+
+      // LEGATO path — pop the stack; if empty, release the voice.
+      // Otherwise glide the voice to the new top-of-stack pitch.
+      const stack = monoStackRef.current;
+      const idx = stack.findIndex((e) => e.code === code);
+      if (idx < 0) return;
+      stack.splice(idx, 1);
+
+      if (stack.length === 0) {
+        monoVoiceRef.current?.handle.release();
+        monoVoiceRef.current = null;
+        emitSustainingChange();
+        return;
+      }
+      const top = stack[stack.length - 1];
+      const v = monoVoiceRef.current;
+      if (!v) return;
+      const baseCents = baseSoundingCents(top.stringIndex);
+      const newHz = centsToHz(a.kararHz, baseCents);
+      v.handle.setFrequency(newHz, a.glideMs ?? 60);
+      v.stringIndex = top.stringIndex;
+      v.currentHz = newHz;
+      const s = a.state.strings[top.stringIndex];
+      const row = s ? a.maqam.rows.find((r) => r.degree === s.rowDegree) : null;
+      const legal = row?.legal_positions ?? [];
+      v.baseMandalIdx = legal.length > 0 && s
+        ? nearestMandalPosition(s.currentCentsMid, legal).index
+        : 0;
+      v.currentMandalIdx = v.baseMandalIdx;
+      activeStringRef.current = top.stringIndex;
       emitSustainingChange();
     };
 
     /** Emit a snapshot of currently-sustaining stringIndices. Multiple
      *  keys can map to the same string (e.g. KeyG and KeyQ both = degree
      *  5 in mid octave); the set deduplicates so the visual stays on
-     *  until the LAST holder releases. */
+     *  until the LAST holder releases. In legato mode the mono voice's
+     *  current stringIndex is also included so its lamp lights. */
     const emitSustainingChange = () => {
       const a = argsRef.current;
       if (!a.onSustainingChange) return;
       const indices = new Set<number>();
       heldNotesRef.current.forEach((note) => indices.add(note.stringIndex));
+      if (monoVoiceRef.current) indices.add(monoVoiceRef.current.stringIndex);
       a.onSustainingChange(indices);
     };
 
@@ -294,6 +402,43 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         note.currentHz = targetHz;
         note.handle.setFrequency(targetHz, glideMs);
       });
+
+      // Legato (mono) voice — same logic, applied to the single voice.
+      const v = monoVoiceRef.current;
+      if (v) {
+        const s = a.state.strings[v.stringIndex];
+        if (!s) return;
+        const row = a.maqam.rows.find((r) => r.degree === s.rowDegree);
+        if (!row) return;
+        const legal = row.legal_positions;
+        if (legal.length === 0) return;
+
+        let targetIdx: number;
+        if (delta === 0) {
+          const canonicalIdx = legal.findIndex((p) => p.is_canonical);
+          targetIdx = canonicalIdx >= 0 ? canonicalIdx : v.baseMandalIdx;
+          pinnedMandalRef.current.delete(v.stringIndex);
+          v.baseMandalIdx = targetIdx;
+        } else {
+          const dir = (delta > 0 ? 1 : -1) as 1 | -1;
+          targetIdx = v.baseMandalIdx;
+          for (let i = 0; i < Math.abs(delta); i++) {
+            targetIdx = stepMandalIndex(targetIdx, dir, legal);
+          }
+        }
+        const diff = targetIdx - v.currentMandalIdx;
+        if (diff !== 0) {
+          const stepDir = (diff > 0 ? 1 : -1) as 1 | -1;
+          for (let i = 0; i < Math.abs(diff); i++) {
+            a.state.stepMandal(v.stringIndex, stepDir);
+          }
+        }
+        v.currentMandalIdx = targetIdx;
+        const targetCents = soundingCentsAt(v.stringIndex, targetIdx);
+        const targetHz = centsToHz(a.kararHz, targetCents);
+        v.currentHz = targetHz;
+        v.handle.setFrequency(targetHz, glideMs);
+      }
     };
 
     /** Slide every held note BACK to its base mandal index + pitch. */
@@ -311,6 +456,21 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         note.currentHz = note.baseHz;
         note.handle.setFrequency(note.baseHz, glideMs);
       });
+
+      // Legato (mono) voice — same revert logic.
+      const v = monoVoiceRef.current;
+      if (v) {
+        const stepsBack = v.baseMandalIdx - v.currentMandalIdx;
+        if (stepsBack !== 0) {
+          const dir = (stepsBack > 0 ? 1 : -1) as 1 | -1;
+          for (let i = 0; i < Math.abs(stepsBack); i++) {
+            a.state.stepMandal(v.stringIndex, dir);
+          }
+        }
+        v.currentMandalIdx = v.baseMandalIdx;
+        v.currentHz = v.baseHz;
+        v.handle.setFrequency(v.baseHz, glideMs);
+      }
     };
 
     /** Modify the active string's mandal state to canonical+delta.
@@ -407,6 +567,9 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
     const releaseAllNotes = () => {
       heldNotesRef.current.forEach((note) => note.handle.release());
       heldNotesRef.current.clear();
+      monoVoiceRef.current?.handle.release();
+      monoVoiceRef.current = null;
+      monoStackRef.current = [];
       emitSustainingChange();
     };
 
