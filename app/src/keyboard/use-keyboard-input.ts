@@ -39,7 +39,6 @@ import {
   type MachineId, type MachineHandle, type ADSR,
   type FilterConfig, type FilterEnv, type LfoConfig,
 } from '../audio/machines';
-import { startSustainedDrone, type DroneHandle } from '../audio/machines/sustained-drone';
 import type { MaqamPreset } from '../tuning/types';
 import type { QanunState } from '../qanun/use-qanun-state';
 import {
@@ -143,7 +142,7 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
   // the voice back to the new top.
   const monoVoiceRef = useRef<MonoVoiceState | null>(null);
   const monoStackRef = useRef<{ code: string; stringIndex: number }[]>([]);
-  const droneRef = useRef<DroneHandle | null>(null);
+  const droneRef = useRef<MachineHandle | null>(null);
   const transposeRef = useRef<number>(0);
   const heldKeysRef = useRef<Set<string>>(new Set());
   // Pinned positions per stringIndex. KeyL is now a no-op (every
@@ -539,22 +538,44 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
     const startDrone = () => {
       if (droneRef.current) return;
       const a = argsRef.current;
-      let hz: number | null = null;
-      heldNotesRef.current.forEach((note) => { if (hz == null) hz = note.currentHz; });
-      if (hz == null && activeStringRef.current != null) {
+
+      // Pick a base pitch: prefer any currently-held voice (poly held
+      // note OR legato mono voice); otherwise fall back to the active
+      // string's sounding cents; otherwise the karar.
+      let baseHz: number | null = null;
+      heldNotesRef.current.forEach((note) => { if (baseHz == null) baseHz = note.currentHz; });
+      if (baseHz == null && monoVoiceRef.current) baseHz = monoVoiceRef.current.currentHz;
+      if (baseHz == null && activeStringRef.current != null) {
         const cents = baseSoundingCents(activeStringRef.current);
-        hz = centsToHz(a.kararHz, cents);
+        baseHz = centsToHz(a.kararHz, cents);
       }
-      if (hz == null) return;
-      // Octave shift: multiply pitch by 2^n where n is the user's
-      // selected drone octave offset (-2..+2). Default 0 = no shift.
-      const oct = a.droneOctave ?? 0;
-      hz = hz * Math.pow(2, oct);
-      droneRef.current = startSustainedDrone({
+      if (baseHz == null) baseHz = a.kararHz;
+
+      // Apply the user's drone-octave offset on top of whatever pitch
+      // was selected. octaveOffset on the trigger stays 0 so the
+      // active machine's normal octave knob doesn't double up.
+      const droneHz = baseHz * Math.pow(2, (a.droneOctave ?? 0));
+
+      // Drone ADSR: short attack, hold at peak indefinitely (s = 1),
+      // medium release. Filter env amount = 0 so the filter sweep
+      // doesn't decay into nothing while held.
+      const droneAdsr: ADSR = { a: 0.05, d: 0.05, s: 1.0, r: 0.6 };
+      const droneFilterEnv: FilterEnv = { ...a.filterEnv, amount: 0 };
+
+      droneRef.current = triggerMachineSustained(a.machineId, {
         audioContext: a.audioContext,
         destination: a.destination,
-        frequencyHz: hz,
-        velocity: 0.85,
+        frequencyHz: droneHz,
+        velocity: 0.6,
+        brightness: a.brightness,
+        body: a.body,
+        adsr: droneAdsr,
+        filter: a.filter,
+        filterEnv: droneFilterEnv,
+        lfo1: a.lfo1,
+        lfo2: a.lfo2,
+        octaveOffset: 0, // drone applies its own octave above; don't double
+        params: a.machineParams,
       });
     };
 
