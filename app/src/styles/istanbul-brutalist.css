@@ -1059,3 +1059,39 @@ input[type='range'] {
   color: var(--saffron, #f4a52a);
   white-space: nowrap;
 }
+
+/* Console module shell */
+.console-module {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 12px;
+  border-right: 1px solid rgba(247, 240, 220, 0.08);
+  background: linear-gradient(180deg, rgba(247, 240, 220, 0.02), transparent);
+}
+.console-module:last-child { border-right: none; }
+.console-module__header {
+  margin-bottom: 6px;
+}
+.console-module__title {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(247, 240, 220, 0.7);
+}
+.console-module__body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: flex-start;
+}
+.console-module__arrow {
+  position: absolute;
+  right: -7px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: var(--saffron, #f4a52a);
+  opacity: 0.5;
+  pointer-events: none;
+}
