@@ -92,17 +92,19 @@ export function OscModule({
           <option value="legato">legato</option>
         </select>
       </label>
-      <Knob
-        label="glide"
-        unit="ms"
-        value={glideMs}
-        min={5}
-        max={300}
-        log
-        defaultValue={60}
-        format={(v) => `${Math.round(v)}ms`}
-        onChange={onGlideMs}
-      />
+      {voiceMode === 'legato' && (
+        <Knob
+          label="glide"
+          unit="ms"
+          value={glideMs}
+          min={5}
+          max={300}
+          log
+          defaultValue={60}
+          format={(v) => `${Math.round(v)}ms`}
+          onChange={onGlideMs}
+        />
+      )}
       {MACHINE_PARAMS[machineId].map(renderMachineParam)}
     </ConsoleModule>
   );
