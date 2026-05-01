@@ -264,7 +264,12 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
     /** Apply a delta (relative to BASE mandal index, not current) to all
      *  currently-held notes. Updates both the audio (setFrequency) AND
      *  the qanun state (state.stepMandal) so the perde labels and the
-     *  position bar slide alongside the pitch. */
+     *  position bar slide alongside the pitch.
+     *
+     *  Special case: delta = 0 (J = canonical) ALWAYS targets the
+     *  maqam's `is_canonical` position, ignoring baseMandalIdx and any
+     *  pin. This is the explicit "reset to canonical" gesture; users
+     *  shouldn't have to think about whether the base drifted. */
     const slideHeldNotesBy = (delta: number, glideMs = 30) => {
       const a = argsRef.current;
       heldNotesRef.current.forEach((note) => {
@@ -275,11 +280,20 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
         const legal = row.legal_positions;
         if (legal.length === 0) return;
 
-        // Target index = base + delta (clamped via stepMandalIndex).
-        const dir = (delta > 0 ? 1 : -1) as 1 | -1;
-        let targetIdx = note.baseMandalIdx;
-        for (let i = 0; i < Math.abs(delta); i++) {
-          targetIdx = stepMandalIndex(targetIdx, dir, legal);
+        let targetIdx: number;
+        if (delta === 0) {
+          const canonicalIdx = legal.findIndex((p) => p.is_canonical);
+          targetIdx = canonicalIdx >= 0 ? canonicalIdx : note.baseMandalIdx;
+          // Also: clear any pin on this string + update note's
+          // baseMandalIdx so subsequent release lands at canonical too.
+          pinnedMandalRef.current.delete(note.stringIndex);
+          note.baseMandalIdx = targetIdx;
+        } else {
+          const dir = (delta > 0 ? 1 : -1) as 1 | -1;
+          targetIdx = note.baseMandalIdx;
+          for (let i = 0; i < Math.abs(delta); i++) {
+            targetIdx = stepMandalIndex(targetIdx, dir, legal);
+          }
         }
 
         // Step state from currentMandalIdx → targetIdx.
@@ -322,13 +336,48 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       const delta = KEY_TO_MANDAL_DELTA[code];
 
       if (heldNotesRef.current.size > 0) {
-        // Notes are ringing → LIVE SLIDE only.
+        // Notes are ringing → LIVE SLIDE. delta=0 → snap to canonical.
         slideHeldNotesBy(delta, 30);
         sliddenByModRef.current.add(code);
+        // J emits a pin-state change because slideHeldNotesBy(0) clears
+        // pins on the affected strings.
+        if (delta === 0) {
+          const a = argsRef.current;
+          if (a.onPinnedChange) a.onPinnedChange(new Set(pinnedMandalRef.current.keys()));
+        }
       } else {
-        // No notes held → arm. Track the source so we know whether
-        // to auto-revert if user holds modifier through next note-on.
+        // No notes held → arm. For J (delta=0) ALSO reset the last-
+        // plucked string to maqam canonical (clears pin + steps state).
+        // Without this, users with no held note had no way to unstick a
+        // retuned string via keyboard.
         pendingDeltaRef.current = { delta, source: code };
+        if (delta === 0) {
+          const a = argsRef.current;
+          const lastIdx = a.lastPluckedRef?.current ?? activeStringRef.current;
+          if (lastIdx != null) {
+            const s = a.state.strings[lastIdx];
+            const row = s ? a.maqam.rows.find((r) => r.degree === s.rowDegree) : null;
+            const legal = row?.legal_positions ?? [];
+            if (s && legal.length > 0) {
+              const canonicalIdx = legal.findIndex((p) => p.is_canonical);
+              const { index: cur } = nearestMandalPosition(s.currentCentsMid, legal);
+              const target = canonicalIdx >= 0 ? canonicalIdx : cur;
+              const diff = target - cur;
+              if (diff !== 0) {
+                const dir = (diff > 0 ? 1 : -1) as 1 | -1;
+                for (let i = 0; i < Math.abs(diff); i++) {
+                  a.state.stepMandal(lastIdx, dir);
+                }
+              }
+            }
+            if (pinnedMandalRef.current.has(lastIdx)) {
+              pinnedMandalRef.current.delete(lastIdx);
+              if (a.onPinnedChange) {
+                a.onPinnedChange(new Set(pinnedMandalRef.current.keys()));
+              }
+            }
+          }
+        }
       }
       return true;
     };
