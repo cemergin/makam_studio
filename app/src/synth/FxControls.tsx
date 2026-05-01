@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import type { ControllableModule, ParamSpec } from '../_core/audio';
-import type { FxKey, MasterBus, RoutingMode } from '../audio/master-bus';
+import type { FxKey, MasterBus } from '../audio/master-bus';
 
 interface Props {
   bus: MasterBus;
@@ -109,33 +109,9 @@ function FxCard({ fx, module, bus }: FxCardProps) {
 }
 
 export function FxControls({ bus }: Props) {
-  const [routing, setRouting] = useState<RoutingMode>('parallel');
-  useEffect(() => { bus.setRoutingMode(routing); }, [routing, bus]);
-
   return (
     <section className="card" aria-label="FX controls">
       <h3 className="card__title">FX</h3>
-      <div className="fx-routing" role="group" aria-label="Send routing">
-        <span className="fx-routing__label">SENDS</span>
-        <button
-          type="button"
-          className={`fx-routing__toggle ${routing === 'parallel' ? 'fx-routing__toggle--on' : ''}`}
-          onClick={() => setRouting('parallel')}
-          aria-pressed={routing === 'parallel'}
-          title="Reverb and delay tap the dry signal in parallel"
-        >
-          PARALLEL
-        </button>
-        <button
-          type="button"
-          className={`fx-routing__toggle ${routing === 'series' ? 'fx-routing__toggle--on' : ''}`}
-          onClick={() => setRouting('series')}
-          aria-pressed={routing === 'series'}
-          title="Delay feeds reverb (delay → reverb → master)"
-        >
-          DELAY → REVERB
-        </button>
-      </div>
       <div className="fx-list">
         {FX_ORDER.map((fx) => (
           <FxCard key={fx} fx={fx} module={bus.effects[fx]} bus={bus} />
