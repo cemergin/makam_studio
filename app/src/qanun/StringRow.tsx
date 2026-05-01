@@ -70,6 +70,11 @@ export function StringRow({
     .filter(Boolean)
     .join(' ');
 
+  const lampClass = [
+    'string-row__lamp',
+    (isFlashing || isSustaining) ? 'string-row__lamp--on' : '',
+  ].filter(Boolean).join(' ');
+
   // Track whether a pointer-down on THIS button is currently active so
   // we don't fire onRelease for a stray onPointerLeave when the pointer
   // never went down here (e.g. user drags from another row).
@@ -98,6 +103,7 @@ export function StringRow({
 
   return (
     <div className={rowClass}>
+      <span className={lampClass} aria-hidden="true" />
       <div className="string-row__mandal">
         <MandalTrack legal={legal} currentIndex={currentIndex} onStep={onStep} />
       </div>

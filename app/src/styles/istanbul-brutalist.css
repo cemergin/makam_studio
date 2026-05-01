@@ -1271,3 +1271,35 @@ input[type='range'] {
 .app--top-console .maqam-rail { grid-area: rail; overflow-y: auto; }
 .app--top-console .main       { grid-area: main; overflow-y: auto; }
 
+
+/* Active-string lamp + emphasis */
+.string-row { position: relative; }
+.string-row__lamp {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(247, 240, 220, 0.18);
+  margin-right: 8px;
+  flex-shrink: 0;
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+.string-row__lamp--on {
+  background: var(--saffron, #f4a52a);
+  box-shadow: 0 0 8px rgba(244, 165, 42, 0.7);
+}
+.string-row--sustaining {
+  border-left-width: 3px;
+  border-left-color: var(--saffron, #f4a52a);
+  box-shadow: inset 4px 0 12px -4px rgba(244, 165, 42, 0.25);
+}
+.string-row--sustaining .string-row__perde-name,
+.string-row--sustaining .string-row__cents {
+  color: rgba(247, 240, 220, 1);
+  font-weight: 600;
+}
+.string-row--flashing .string-row__pluck-line {
+  background: var(--saffron, #f4a52a);
+  height: 3px;
+  transition: background 200ms ease, height 200ms ease;
+}
