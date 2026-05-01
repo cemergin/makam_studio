@@ -1,20 +1,29 @@
 // useKeyboardInput — global window key listener that drives the qanun.
 //
-// Three concerns, all keyed off `KeyboardEvent.code` so the user's OS
-// layout (QWERTY, AZERTY, Dvorak, Colemak, …) doesn't matter:
+// PERSISTENT-STATE MODIFIER MODEL — like a real qanun:
 //
-//   1. KEY_TO_SCALE keys → start a SUSTAINED qanun voice on keydown,
-//      release on keyup. Multiple keys can be held simultaneously
-//      (poly). The string-index becomes the "active note" so the
-//      modifier flower targets it.
+//   1. KEY_TO_SCALE keys → start a SUSTAINED machine voice on keydown,
+//      release on keyup. NO auto-revert on release; the string stays
+//      where the user put it. Multi-key sustains are polyphonic.
 //
-//   2. KEY_TO_MANDAL_DELTA keys are SILENT. If notes are currently
-//      held, the modifier slides each held voice's pitch live (a
-//      hammer-on / pull-off / çarpma). Releasing the modifier slides
-//      back. The modifier ALSO arms a pending delta for the next
-//      scale-key pluck (so press H, then S, and S sounds modified).
-//      KeyJ = canonical (delta 0; clears any pending arm; resets any
-//      slid-active voices to their base pitches).
+//   2. KEY_TO_MANDAL_DELTA modifiers (silent — they never trigger a
+//      voice) split into TWO behaviors based on whether notes are
+//      currently ringing:
+//
+//        • WITH held notes — TEMPORARY carpma. Press slides held
+//          voices up/down; release slides them back. Audio + state
+//          both move during the press, both revert on release. This
+//          is the ornament gesture.
+//
+//        • WITHOUT held notes — PERSISTENT state flip. The active
+//          (last-plucked) string's mandal moves to canonical+delta
+//          and STAYS there. Subsequent plucks of that string sound at
+//          the modified pitch. This is the mode-shift gesture.
+//
+//      KeyJ = canonical reset. With held notes: slides them to maqam
+//      canonical and updates their base so they stay there on release.
+//      Without held notes: resets the active string's state to
+//      canonical.
 //
 //   3. Space → start a sustained drone on the most-recent pitch; on
 //      keyup, release it. Shift → transpose +5 scale degrees while
@@ -97,13 +106,8 @@ interface HeldNote {
   stringIndex: number;
   baseHz: number;             // pitch at keydown time
   currentHz: number;          // current sounding pitch (after any modifier slide)
-  baseMandalIdx: number;      // mandal index at keydown time
+  baseMandalIdx: number;      // mandal index at keydown time (the "rest position" for carpma return)
   currentMandalIdx: number;   // current mandal index (drives state visualization)
-  /** If this note was modified via pendingDelta from a modifier that was
-   *  STILL HELD at note-start time, track which modifier code so its
-   *  keyup can revert the modification. null = modification is sticky
-   *  (the modifier was already released before the note started). */
-  pendingSource: string | null;
 }
 
 export function useKeyboardInput(args: UseKeyboardInputArgs): void {
@@ -115,13 +119,9 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
   const droneRef = useRef<DroneHandle | null>(null);
   const transposeRef = useRef<number>(0);
   const heldKeysRef = useRef<Set<string>>(new Set());
-  // Pending modifier delta for the NEXT scale-key pluck. Tracks the
-  // source modifier code so we know whether to revert on its keyup
-  // (only if still held when the note starts).
-  const pendingDeltaRef = useRef<{ delta: number; source: string | null }>({ delta: 0, source: null });
-  // Pinned positions per stringIndex. KeyL toggles a pin on the active
-  // string at its current mandal index; while pinned, releaseScaleNote
-  // reverts to that pinned index instead of the maqam canonical.
+  // Pinned positions per stringIndex. KeyL is now a no-op (every
+  // modifier press is already persistent in the new model), but the
+  // pin map is kept so the visual badge can be re-purposed.
   const pinnedMandalRef = useRef<Map<number, number>>(new Map());
   // Modifier codes that engaged a LIVE slide (their press-time held
   // notes were retuned). Used by keyup to know whether to slide back.
@@ -159,49 +159,18 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       const existing = heldNotesRef.current.get(code);
       if (existing) existing.handle.release();
 
+      // Read the string's CURRENT state (including any persistent
+      // modifications applied by previous modifier presses). The note
+      // sounds wherever the string currently is — that's the whole
+      // point of the persistent model.
       const s = a.state.strings[stringIndex];
       const row = s ? a.maqam.rows.find((r) => r.degree === s.rowDegree) : null;
       const legal = row?.legal_positions ?? [];
       const baseMandalIdx = legal.length > 0 && s
         ? nearestMandalPosition(s.currentCentsMid, legal).index
         : 0;
-
       const baseCents = baseSoundingCents(stringIndex);
-
-      // Apply pending modifier (if any) BEFORE the keydown sounds.
-      // This ALSO updates the qanun state so the visualization moves.
-      // If the source modifier is STILL HELD, track its code so the
-      // modifier's keyup can auto-revert the note.
-      let initialMandalIdx = baseMandalIdx;
-      let initialCents = baseCents;
-      let pendingSource: string | null = null;
-      const pending = pendingDeltaRef.current;
-      if (pending.delta !== 0 && legal.length > 0) {
-        const delta = pending.delta;
-        const dir = (delta > 0 ? 1 : -1) as 1 | -1;
-        let target = baseMandalIdx;
-        for (let i = 0; i < Math.abs(delta); i++) {
-          target = stepMandalIndex(target, dir, legal);
-        }
-        const diff = target - baseMandalIdx;
-        if (diff !== 0) {
-          const stepDir = (diff > 0 ? 1 : -1) as 1 | -1;
-          for (let i = 0; i < Math.abs(diff); i++) {
-            a.state.stepMandal(stringIndex, stepDir);
-          }
-        }
-        initialMandalIdx = target;
-        initialCents = soundingCentsAt(stringIndex, target);
-        // If the modifier that armed this delta is STILL held when this
-        // note starts, mark it as the revert-source. If already released
-        // (tap-armed-then-played), the modification is sticky.
-        if (pending.source && heldKeysRef.current.has(pending.source)) {
-          pendingSource = pending.source;
-        }
-        pendingDeltaRef.current = { delta: 0, source: null };
-      }
-      const hz = centsToHz(a.kararHz, initialCents);
-      const baseHz = centsToHz(a.kararHz, baseCents);
+      const hz = centsToHz(a.kararHz, baseCents);
 
       const handle = triggerMachineSustained(a.machineId, {
         audioContext: a.audioContext,
@@ -220,11 +189,10 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       heldNotesRef.current.set(code, {
         handle,
         stringIndex,
-        baseHz,
+        baseHz: hz,
         currentHz: hz,
         baseMandalIdx,
-        currentMandalIdx: initialMandalIdx,
-        pendingSource,
+        currentMandalIdx: baseMandalIdx,
       });
       activeStringRef.current = stringIndex;
       a.onPluck?.(stringIndex);
@@ -234,38 +202,8 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
     const releaseScaleNote = (code: string) => {
       const note = heldNotesRef.current.get(code);
       if (!note) return;
-
-      // Revert the qanun state to the note's baseMandalIdx (canonical
-      // at note-start time) so the string doesn't stay visually
-      // modified after the note ends. This is what makes subsequent
-      // plucks compute their "canonical" from the actual maqam
-      // canonical instead of from a stuck-modified position — the bug
-      // the user just called out.
-      //
-      // Skip the revert if ANOTHER held key still holds this string
-      // (e.g. KeyG and KeyQ both = degree 5). The other holder's
-      // local currentMandalIdx tracking would get stale otherwise.
-      let otherHolderExists = false;
-      heldNotesRef.current.forEach((other, otherCode) => {
-        if (otherCode !== code && other.stringIndex === note.stringIndex) {
-          otherHolderExists = true;
-        }
-      });
-
-      if (!otherHolderExists) {
-        const a = argsRef.current;
-        // If the string is pinned, revert to the pinned index. Else
-        // revert to the note's baseMandalIdx (canonical at note-start).
-        const targetIdx = pinnedMandalRef.current.get(note.stringIndex) ?? note.baseMandalIdx;
-        const stepsBack = targetIdx - note.currentMandalIdx;
-        if (stepsBack !== 0) {
-          const dir = (stepsBack > 0 ? 1 : -1) as 1 | -1;
-          for (let i = 0; i < Math.abs(stepsBack); i++) {
-            a.state.stepMandal(note.stringIndex, dir);
-          }
-        }
-      }
-
+      // PERSISTENT model: no auto-revert on release. The string stays
+      // wherever it currently is. Use J to explicitly reset to canonical.
       note.handle.release();
       heldNotesRef.current.delete(code);
       emitSustainingChange();
@@ -365,53 +303,53 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       });
     };
 
+    /** Modify the active string's mandal state to canonical+delta.
+     *  Persistent — state STAYS until another modifier or J. No audio
+     *  is triggered (modifier keys are silent). */
+    const flipActiveString = (delta: number) => {
+      const a = argsRef.current;
+      const stringIndex = a.lastPluckedRef?.current ?? activeStringRef.current;
+      if (stringIndex == null) return;
+      const s = a.state.strings[stringIndex];
+      if (!s) return;
+      const row = a.maqam.rows.find((r) => r.degree === s.rowDegree);
+      if (!row) return;
+      const legal = row.legal_positions;
+      if (legal.length === 0) return;
+
+      const canonicalIdx = legal.findIndex((p) => p.is_canonical);
+      if (canonicalIdx < 0) return;
+
+      // Target = canonical + delta (clamped via stepMandalIndex).
+      const dir = (delta > 0 ? 1 : -1) as 1 | -1;
+      let targetIdx = canonicalIdx;
+      for (let i = 0; i < Math.abs(delta); i++) {
+        targetIdx = stepMandalIndex(targetIdx, dir, legal);
+      }
+
+      // Step state from current position → target.
+      const { index: cur } = nearestMandalPosition(s.currentCentsMid, legal);
+      const stepsTo = targetIdx - cur;
+      if (stepsTo !== 0) {
+        const stepDir = (stepsTo > 0 ? 1 : -1) as 1 | -1;
+        for (let i = 0; i < Math.abs(stepsTo); i++) {
+          a.state.stepMandal(stringIndex, stepDir);
+        }
+      }
+    };
+
     const handleModifierDown = (code: string): boolean => {
       if (!(code in KEY_TO_MANDAL_DELTA)) return false;
       const delta = KEY_TO_MANDAL_DELTA[code];
 
       if (heldNotesRef.current.size > 0) {
-        // Notes are ringing → LIVE SLIDE. delta=0 → snap to canonical.
+        // Notes ringing → TEMPORARY carpma. Slide live; reverts on
+        // modifier release.
         slideHeldNotesBy(delta, 30);
         sliddenByModRef.current.add(code);
-        // J emits a pin-state change because slideHeldNotesBy(0) clears
-        // pins on the affected strings.
-        if (delta === 0) {
-          const a = argsRef.current;
-          if (a.onPinnedChange) a.onPinnedChange(new Set(pinnedMandalRef.current.keys()));
-        }
       } else {
-        // No notes held → arm. For J (delta=0) ALSO reset the last-
-        // plucked string to maqam canonical (clears pin + steps state).
-        // Without this, users with no held note had no way to unstick a
-        // retuned string via keyboard.
-        pendingDeltaRef.current = { delta, source: code };
-        if (delta === 0) {
-          const a = argsRef.current;
-          const lastIdx = a.lastPluckedRef?.current ?? activeStringRef.current;
-          if (lastIdx != null) {
-            const s = a.state.strings[lastIdx];
-            const row = s ? a.maqam.rows.find((r) => r.degree === s.rowDegree) : null;
-            const legal = row?.legal_positions ?? [];
-            if (s && legal.length > 0) {
-              const canonicalIdx = legal.findIndex((p) => p.is_canonical);
-              const { index: cur } = nearestMandalPosition(s.currentCentsMid, legal);
-              const target = canonicalIdx >= 0 ? canonicalIdx : cur;
-              const diff = target - cur;
-              if (diff !== 0) {
-                const dir = (diff > 0 ? 1 : -1) as 1 | -1;
-                for (let i = 0; i < Math.abs(diff); i++) {
-                  a.state.stepMandal(lastIdx, dir);
-                }
-              }
-            }
-            if (pinnedMandalRef.current.has(lastIdx)) {
-              pinnedMandalRef.current.delete(lastIdx);
-              if (a.onPinnedChange) {
-                a.onPinnedChange(new Set(pinnedMandalRef.current.keys()));
-              }
-            }
-          }
-        }
+        // No notes ringing → PERSISTENT mode-shift on the active string.
+        flipActiveString(delta);
       }
       return true;
     };
@@ -421,36 +359,11 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       const wasSliding = sliddenByModRef.current.has(code);
       sliddenByModRef.current.delete(code);
       if (wasSliding && heldNotesRef.current.size > 0) {
+        // Carpma return — slide held notes back to where they were
+        // before the modifier press.
         slideHeldNotesToBase(40);
       }
-      // Auto-revert held notes whose pending-arm source was THIS modifier
-      // (user held modifier through note-start; modifier release should
-      // pull the note back to its canonical pitch).
-      revertHeldNotesWithPendingSource(code, 40);
-      // Pending arm is STICKY — survives the source modifier's keyup.
-      // The tap-arm-then-play pattern depends on this. Cleared only by
-      // a scale-key consumption or by pressing J (canonical = delta 0).
       return true;
-    };
-
-    /** Slide back any held notes that were originally modified via
-     *  pendingDelta from `code`. Clears their pendingSource. */
-    const revertHeldNotesWithPendingSource = (code: string, glideMs = 40) => {
-      const a = argsRef.current;
-      heldNotesRef.current.forEach((note) => {
-        if (note.pendingSource !== code) return;
-        const stepsBack = note.baseMandalIdx - note.currentMandalIdx;
-        if (stepsBack !== 0) {
-          const dir = (stepsBack > 0 ? 1 : -1) as 1 | -1;
-          for (let i = 0; i < Math.abs(stepsBack); i++) {
-            a.state.stepMandal(note.stringIndex, dir);
-          }
-        }
-        note.currentMandalIdx = note.baseMandalIdx;
-        note.currentHz = note.baseHz;
-        note.handle.setFrequency(note.baseHz, glideMs);
-        note.pendingSource = null;
-      });
     };
 
     const startDrone = () => {
@@ -607,7 +520,6 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
       releaseAllNotes();
       releaseDrone();
       transposeRef.current = 0;
-      pendingDeltaRef.current = { delta: 0, source: null };
       sliddenByModRef.current.clear();
       heldKeysRef.current.clear();
     };
@@ -634,7 +546,6 @@ export function useKeyboardInput(args: UseKeyboardInputArgs): void {
             currentHz: baseHz,
             baseMandalIdx,
             currentMandalIdx: baseMandalIdx,
-            pendingSource: null,
           });
           activeStringRef.current = stringIndex;
           argsRef.current.onPluck?.(stringIndex);
